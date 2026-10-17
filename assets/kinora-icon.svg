@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <rect x="32" y="32" width="960" height="960" rx="220" fill="#18181b"/>
+  <!-- flip cards fanned around the spindle, like the 1890s Kinora viewer -->
+  <g transform="translate(512 744)">
+    <g transform="rotate(-38)"><rect x="-200" y="-470" width="400" height="300" rx="36" fill="#3f3f46"/></g>
+    <g transform="rotate(-19)"><rect x="-200" y="-470" width="400" height="300" rx="36" fill="#71717a"/></g>
+    <g><rect x="-200" y="-470" width="400" height="300" rx="36" fill="#f4f4f5"/>
+       <path d="M-40 -380 L60 -320 L-40 -260 Z" fill="#18181b"/></g>
+    <rect x="-8" y="-170" width="16" height="170" rx="8" fill="#a1a1aa"/>
+    <circle r="56" fill="#f4f4f5"/>
+    <circle r="22" fill="#18181b"/>
+  </g>
+</svg>

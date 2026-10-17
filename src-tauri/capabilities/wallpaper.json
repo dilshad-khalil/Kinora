@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "wallpaper",
+  "description": "Wallpaper player windows: events only",
+  "windows": ["wallpaper-*"],
+  "permissions": ["core:event:default"]
+}
