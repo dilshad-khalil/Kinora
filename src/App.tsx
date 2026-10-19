@@ -22,8 +22,8 @@ function TitleBar() {
         <IconButton label="Minimize" size="icon-sm" onClick={() => win.minimize()}>
           <Minus />
         </IconButton>
-        {/* Close hides to the tray; Rust also catches the native close. */}
-        <IconButton label="Close to tray" size="icon-sm" onClick={() => win.hide()}>
+        {/* Closing destroys the panel to free its memory; Kinora keeps running in the tray. */}
+        <IconButton label="Close to tray" size="icon-sm" onClick={() => win.close()}>
           <X />
         </IconButton>
       </div>

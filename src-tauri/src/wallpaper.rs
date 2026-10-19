@@ -1,4 +1,6 @@
-//! One borderless player window per monitor, pinned behind the desktop icons.
+//! One borderless player window spanning all monitors, pinned behind the desktop icons.
+//! A single window means a single WebView2 renderer, however many monitors there are;
+//! the page lays out one <video> per monitor.
 
 use std::{
     path::Path,
@@ -9,6 +11,7 @@ use std::{
 };
 
 use serde::Serialize;
+use windows::Win32::Foundation::RECT;
 use tauri::{
     webview::Color, AppHandle, Emitter, EventTarget, Manager, WebviewUrl, WebviewWindowBuilder,
 };
@@ -42,7 +45,7 @@ fn destroy_windows(app: &AppHandle) {
     }
 }
 
-/// (Re)create one player window per monitor and attach them to the desktop.
+/// (Re)create the player window and attach it to the desktop.
 fn build(app: &AppHandle) -> Result<(), String> {
     let _guard = BUILD.lock().unwrap();
     BUILDING.store(true, Ordering::Relaxed);
@@ -55,25 +58,33 @@ fn build_inner(app: &AppHandle) -> Result<(), String> {
     destroy_windows(app);
     let host = desktop::find_host()?;
     let monitors = monitors::list(app);
-    // Fresh labels each build, so a window that is still being destroyed never collides.
-    let generation = GENERATION.fetch_add(1, Ordering::Relaxed);
+    // Bounding box of all monitors, in physical virtual-screen coordinates.
+    let bounds = monitors
+        .iter()
+        .map(|m| m.rect())
+        .reduce(|a, b| RECT {
+            left: a.left.min(b.left),
+            top: a.top.min(b.top),
+            right: a.right.max(b.right),
+            bottom: a.bottom.max(b.bottom),
+        })
+        .ok_or("No monitors found.")?;
 
-    for (i, monitor) in monitors.iter().enumerate() {
-        let label = format!("{PREFIX}{generation}-{i}");
-        let win = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("wallpaper.html".into()))
-            .title("Kinora wallpaper")
-            .decorations(false)
-            .skip_taskbar(true)
-            .focused(false)
-            .visible(false)
-            .shadow(false)
-            .resizable(false)
-            .background_color(Color(0, 0, 0, 255))
-            .build()
-            .map_err(|e| e.to_string())?;
-        let hwnd = win.hwnd().map_err(|e| e.to_string())?;
-        desktop::attach(hwnd, &host, monitor.rect())?;
-    }
+    // Fresh label each build, so a window that is still being destroyed never collides.
+    let label = format!("{PREFIX}{}", GENERATION.fetch_add(1, Ordering::Relaxed));
+    let win = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("wallpaper.html".into()))
+        .title("Kinora wallpaper")
+        .decorations(false)
+        .skip_taskbar(true)
+        .focused(false)
+        .visible(false)
+        .shadow(false)
+        .resizable(false)
+        .background_color(Color(0, 0, 0, 255))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let hwnd = win.hwnd().map_err(|e| e.to_string())?;
+    desktop::attach(hwnd, &host, bounds)?;
 
     let app_state = app.state::<AppState>();
     let mut runtime = app_state.runtime.lock().unwrap();

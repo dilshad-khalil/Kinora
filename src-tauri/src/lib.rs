@@ -8,7 +8,7 @@ mod watcher;
 
 use std::path::Path;
 
-use tauri::{Emitter, Listener, Manager, WindowEvent};
+use tauri::{Emitter, Listener, Manager, RunEvent};
 use tauri_plugin_autostart::MacosLauncher;
 
 use state::AppState;
@@ -39,17 +39,21 @@ pub fn run() {
 
             tray::build(&handle)?;
 
-            // Closing the window hides it to the tray; only tray → Quit exits.
-            let main = app.get_webview_window("main").unwrap();
-            let main_clone = main.clone();
-            main.on_window_event(move |event| {
-                if let WindowEvent::CloseRequested { api, .. } = event {
-                    api.prevent_close();
-                    let _ = main_clone.hide();
-                }
-            });
+            // The control panel is created on demand and destroyed when closed, so it costs
+            // no memory while Kinora sits in the tray. Login starts (--hidden) skip it.
             if !std::env::args().any(|a| a == "--hidden") {
-                main.show()?;
+                tray::create_main(&handle)?;
+            }
+
+            // Autostart stores this exe's path. Re-register so the entry follows the installed
+            // app (and replaces any stale entry, e.g. one written by a dev build).
+            #[cfg(not(debug_assertions))]
+            {
+                use tauri_plugin_autostart::ManagerExt;
+                let autolaunch = handle.autolaunch();
+                if autolaunch.is_enabled().unwrap_or(false) {
+                    let _ = autolaunch.enable();
+                }
             }
 
             let h = handle.clone();
@@ -84,6 +88,13 @@ pub fn run() {
             commands::list_monitors,
             commands::missing_files,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Kinora");
+        .build(tauri::generate_context!())
+        .expect("error while building Kinora")
+        .run(|_app, event| {
+            // Closing the last window must not quit: Kinora lives in the tray.
+            // Only an explicit exit (tray → Quit) carries an exit code.
+            if let RunEvent::ExitRequested { code: None, api, .. } = event {
+                api.prevent_exit();
+            }
+        });
 }

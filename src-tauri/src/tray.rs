@@ -1,7 +1,7 @@
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Manager, Wry,
+    AppHandle, Manager, WebviewWindowBuilder, Wry,
 };
 
 use crate::{
@@ -90,5 +90,28 @@ pub fn show_main(app: &AppHandle) {
         let _ = win.show();
         let _ = win.unminimize();
         let _ = win.set_focus();
+        return;
     }
+    // Built off the main thread: creating a window from an event handler can deadlock on Windows.
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = create_main(&app) {
+            eprintln!("kinora: couldn't open the control panel: {e}");
+        }
+    });
+}
+
+/// Build the control panel from its `tauri.conf.json` entry (which has `create: false`).
+pub fn create_main(app: &AppHandle) -> tauri::Result<()> {
+    let config = app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|w| w.label == "main")
+        .expect("main window config")
+        .clone();
+    let win = WebviewWindowBuilder::from_config(app, &config)?.build()?;
+    win.show()?;
+    win.set_focus()
 }

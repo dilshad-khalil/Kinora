@@ -20,6 +20,7 @@ function Row(props: {
   label: string;
   hint?: string;
   checked: boolean;
+  disabled?: boolean;
   onChange: (v: boolean) => void;
 }) {
   return (
@@ -28,7 +29,12 @@ function Row(props: {
         <span>{props.label}</span>
         {props.hint && <span className="text-xs font-normal text-muted-foreground">{props.hint}</span>}
       </Label>
-      <Switch id={props.id} checked={props.checked} onCheckedChange={props.onChange} />
+      <Switch
+        id={props.id}
+        checked={props.checked}
+        disabled={props.disabled}
+        onCheckedChange={props.onChange}
+      />
     </div>
   );
 }
@@ -63,8 +69,12 @@ export function SettingsSheet() {
           <Row
             id="autostart"
             label="Launch at login"
-            hint="Restores your last wallpaper"
+            hint={
+              // A dev build loads its UI from the Vite server, which isn't running at login.
+              import.meta.env.DEV ? "Only in the installed app" : "Restores your last wallpaper"
+            }
             checked={launchAtLogin}
+            disabled={import.meta.env.DEV}
             onChange={setLaunchAtLogin}
           />
           <Row
