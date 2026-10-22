@@ -6,6 +6,7 @@ use tauri_plugin_opener::OpenerExt;
 use crate::{
     desktop,
     monitors::{self, MonitorInfo},
+    providers,
     state::{self, Fit, KinoraState},
     wallpaper,
     widgets::{self, Instance, WidgetsState},
@@ -115,4 +116,16 @@ pub async fn open_widget_editor(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn close_widget_editor(app: AppHandle) {
     widgets::close_editor(&app);
+}
+
+/// The latest value of a live-data topic, for pages that open after it was sent.
+#[tauri::command]
+pub fn widget_data(topic: String) -> Option<serde_json::Value> {
+    providers::latest(&topic)
+}
+
+/// Relayed by the page hosting the widget; the widget itself can't call commands.
+#[tauri::command]
+pub fn widget_notify(app: AppHandle, instance: String, title: String, body: String) -> Result<(), String> {
+    widgets::notify_from(&app, &instance, &title, &body)
 }

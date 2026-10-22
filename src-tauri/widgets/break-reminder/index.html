@@ -1,0 +1,88 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; }
+      body {
+        --fg: #fff;
+        --dim: rgba(235, 235, 245, 0.6);
+        --track: rgba(255, 255, 255, 0.12);
+        --tint: rgba(28, 28, 30, 0.78);
+        --accent: #64d2ff;
+        font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+        color: var(--fg);
+      }
+      body.light { --fg: #1c1c1e; --dim: rgba(60, 60, 67, 0.6); --track: rgba(0, 0, 0, 0.08); --tint: rgba(246, 246, 248, 0.86); }
+      body.clear { --tint: transparent; text-shadow: 0 1px 10px rgba(0, 0, 0, 0.5); }
+
+      .tile { box-sizing: border-box; height: 100%; display: grid; place-items: center; background: var(--tint); }
+      .gauge { position: relative; height: 80%; aspect-ratio: 1; }
+      svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+      circle { fill: none; stroke-width: 7; stroke-linecap: round; }
+      .track { stroke: var(--track); }
+      .bar { stroke: var(--accent); transition: stroke-dashoffset 1s linear; }
+      .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+      .time { font-size: min(19vh, 19vw); font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+      .label { margin-top: 0.35em; font-size: min(7.5vh, 7.5vw); font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: 0.06em; }
+    </style>
+  </head>
+  <body class="dark">
+    <div class="tile">
+      <div class="gauge">
+        <svg viewBox="0 0 100 100">
+          <circle class="track" cx="50" cy="50" r="44" />
+          <circle class="bar" id="bar" cx="50" cy="50" r="44" />
+        </svg>
+        <div class="center">
+          <div class="time" id="time">–</div>
+          <div class="label" id="label">Next break</div>
+        </div>
+      </div>
+    </div>
+
+    <script src="/kinora.js"></script>
+    <script>
+      var s = { minutes: 45, message: "Stand up, stretch and rest your eyes for a minute.", fullscreen: false, theme: "dark", accent: "#64d2ff" };
+      var C = 2 * Math.PI * 44;
+      var bar = document.getElementById("bar");
+      bar.style.strokeDasharray = C;
+
+      var period = function () { return Math.max(1, Number(s.minutes) || 45) * 60000; };
+      var due = Date.now() + period();
+
+      function render() {
+        var left = Math.max(0, due - Date.now());
+        var mins = Math.ceil(left / 60000);
+        document.getElementById("time").textContent = left < 60000 ? Math.ceil(left / 1000) + "s" : mins + "m";
+        bar.style.strokeDashoffset = C * (1 - left / period());
+      }
+
+      // Runs while hidden too, so breaks stay on schedule during fullscreen apps.
+      function tick() {
+        if (Date.now() >= due) {
+          if (Kinora.visible || s.fullscreen) Kinora.notify("Time for a break", s.message);
+          due = Date.now() + period();
+        }
+        if (Kinora.visible) render();
+      }
+      setInterval(tick, 1000);
+
+      Kinora.onSettings(function (next) {
+        var oldMinutes = s.minutes;
+        s = Object.assign(s, next);
+        if (s.minutes !== oldMinutes) due = Date.now() + period(); // restart with the new interval
+        document.body.className = s.theme;
+        document.body.style.setProperty("--accent", s.accent);
+        render();
+      });
+
+      Kinora.onError(function (message) {
+        document.getElementById("label").textContent = "Blocked";
+        console.warn(message);
+      });
+
+      render();
+    </script>
+  </body>
+</html>

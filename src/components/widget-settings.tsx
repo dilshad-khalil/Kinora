@@ -12,6 +12,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { Permissions } from "@/components/widget-permissions";
 import {
   resolveSettings,
   widgetCommands,
@@ -156,6 +157,7 @@ export function WidgetSettings(props: {
         <SheetHeader>
           <SheetTitle>{widget?.name ?? "Widget"}</SheetTitle>
           <SheetDescription>{widget?.description || "Changes show on your desktop right away."}</SheetDescription>
+          {widget && <Permissions widget={widget} className="mt-1" />}
         </SheetHeader>
         <div className="flex flex-col gap-5 overflow-y-auto px-4 pb-4">
           {widget?.settings.length ? (

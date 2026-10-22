@@ -7,7 +7,8 @@ arrive.
 
 The user will describe the widget they want after this document. If something they ask for
 is impossible under the rules below (for example live weather, which needs the internet), say
-so and offer the closest thing that works.
+so and offer the closest thing that works. Kinora *does* provide system stats, the media
+that's playing (with artwork), and Windows notifications (see section 5).
 
 ---
 
@@ -45,6 +46,7 @@ Every field is optional. These are the defaults:
   "size": { "width": 320, "height": 180, "minWidth": 80, "minHeight": 60, "resizable": true },
   "glass": false,
   "radius": 0,
+  "permissions": [],
   "settings": []
 }
 ```
@@ -58,6 +60,7 @@ Every field is optional. These are the defaults:
 | `size.resizable` | Whether the user can resize it. |
 | `radius` | Kinora clips the widget to rounded corners of this many px. Use it for tile-style widgets (24 matches the built-ins). |
 | `glass` | Kinora blurs the wallpaper behind the widget. **Leave this `false`**: over a video it costs about 200 MB of GPU memory. Paint a semi-transparent background instead. |
+| `permissions` | Live data and actions the widget uses: `"system"`, `"media"`, `"notifications"` (see section 5). List only what you use; users see these before adding the widget. |
 | `settings` | User-editable options (see section 3). |
 
 The JSON must be strictly valid: no comments, no trailing commas. A broken `widget.json`
@@ -108,12 +111,90 @@ It defines `window.Kinora`:
 | --- | --- |
 | `Kinora.onSettings(fn)` | Calls `fn(settings)` with the settings object, right away if they've already arrived, and again every time the user changes something (live, with no reload). |
 | `Kinora.onVisibility(fn)` | Calls `fn(visible)` right away and whenever it changes. `false` while a fullscreen app or game is open. The widget is hidden then, so stop timers and animations. |
+| `Kinora.on(topic, fn)` | Live data. `topic` is `"system"` or `"media"`. Calls `fn(data)` right away if data has already arrived, then on every update. Needs the matching permission (section 5). |
+| `Kinora.notify(title, body)` | Shows a Windows notification. Needs the `"notifications"` permission. |
+| `Kinora.onError(fn)` | Calls `fn(message)` when Kinora refuses a request, for example a missing permission or a rate limit. |
 | `Kinora.settings` | The latest settings object, or `null` before the first one arrives. |
 | `Kinora.visible` | The latest visibility (boolean). |
+| `Kinora.permissions` | The permissions Kinora granted (from `widget.json`). |
+| `Kinora.data` | The latest value per topic, e.g. `Kinora.data.system` (`undefined` until it arrives). |
 
-There is nothing else: no storage API, no data API, no way to send messages to Kinora.
+That's the whole API: no storage, no network, no clicks.
 
-## 5. The sandbox: hard rules
+## 5. Live data and notifications
+
+Add the permission to `widget.json`, for example `"permissions": ["system", "media"]`. Without
+it, `Kinora.on` never fires and `Kinora.notify` is refused. Data only flows while the widget
+is on the desktop and visible (it pauses during fullscreen apps), so render whatever you
+have and handle `undefined`/`null`.
+
+### `"system"`: updates every second
+
+```js
+Kinora.on("system", function (d) {
+  d.cpu.usage;        // 0-100, one decimal (the first sample can be 0)
+  d.cpu.cores;        // logical processors, e.g. 16
+  d.cpu.name;         // "AMD Ryzen 9 5900HX with Radeon Graphics"
+  d.memory.used;      // bytes
+  d.memory.total;     // bytes
+  d.memory.usage;     // 0-100
+  d.disks;            // [{ mount: "C:\\", used, total, usage }], fixed drives only (bytes, 0-100)
+  d.network.down;     // bytes per second, all adapters
+  d.network.up;       // bytes per second
+  d.battery;          // null on desktops, else { percent: 0-100 or null, charging: bool, pluggedIn: bool }
+  d.uptime;           // seconds since boot
+});
+```
+
+Use 1000 for KB/MB/GB to match Windows' own speed display. Disk mounts end in a backslash
+(`"C:\\"` in JavaScript source).
+
+### `"media"`: the song or video playing in any app
+
+This is the same source as the Windows volume flyout (Spotify, browsers, the Media Player app,
+and so on). It's sent only when something changes: a new track, play/pause, a seek. It is
+**not** sent every second.
+
+```js
+Kinora.on("media", function (m) {
+  if (!m) { /* nothing is playing, or no media app is open */ return; }
+  m.title;      // "Dark Red"
+  m.artist;     // "Steve Lacy" (may be "")
+  m.album;      // may be ""
+  m.app;        // app id, e.g. "Spotify.exe" or "SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify"
+  m.status;     // "playing" | "paused" | "stopped" | "changing" | "closed"
+  m.playing;    // boolean
+  m.position;   // seconds into the track at the moment `updatedAt`
+  m.duration;   // seconds, 0 if unknown (live streams)
+  m.updatedAt;  // Date.now()-style ms timestamp for `position`
+  m.artwork;    // "data:image/...;base64,..." or null. Use it as <img src> or a CSS url("...")
+});
+```
+
+To show a moving progress bar, extrapolate the position yourself instead of waiting for
+updates:
+`var pos = m.position + (m.playing ? (Date.now() - m.updatedAt) / 1000 : 0);`
+Update it with a 1-second timer while `m.playing`, and clamp it to `m.duration`.
+
+Widgets can't control playback (no clicks), so this is read-only.
+
+### `"notifications"`: send a Windows notification
+
+```js
+Kinora.notify("Time for a break", "Stand up and stretch.");
+Kinora.onError(function (message) { console.warn(message); });
+```
+
+- At most one notification every **10 seconds** per widget. Extra calls are refused through
+  `onError`.
+- The title is cut at 80 characters and the body at 300. Plain text only.
+- Notifications are only sent from the widget on the desktop, not from previews in Kinora's
+  window, so the user never gets duplicates.
+- Use them for events the user actually wants (a timer finishing, a reminder), never on a
+  loop. Windows Do Not Disturb may send them silently to the notification center.
+- Widgets can **send** notifications, but they can't read other apps' notifications.
+
+## 6. The sandbox: hard rules
 
 The widget runs in `<iframe sandbox="allow-scripts">` with an opaque (`null`) origin, served
 with this Content-Security-Policy:
@@ -141,7 +222,7 @@ So:
   `Consolas`, `Georgia`, `system-ui`).
 
 **Blocked: the widget breaks if it relies on any of these**
-- **Anything from the internet**: `fetch`/`XMLHttpRequest`/WebSocket, CDN scripts (no React,
+- **Anything from the internet**: `fetch`/`XMLHttpRequest`/WebSocket (Kinora's data comes through `Kinora.on`, not fetch), CDN scripts (no React,
   Tailwind CDN, jQuery CDN or Google Fonts links), remote images, remote fonts. Bundle every
   asset in the folder, or inline it.
 - `eval`, `new Function`, and string arguments to `setTimeout`/`setInterval`. Any library
@@ -157,7 +238,7 @@ So:
 
 Use classic `<script>` tags. Avoid `type="module"`.
 
-## 6. Layout and look
+## 7. Layout and look
 
 - The widget's viewport is the widget, in CSS pixels. The user can resize it at any time, so
   size things with `vw`/`vh`/`%`/`min()`/`clamp()` or listen for `resize`. It must look right
@@ -174,7 +255,7 @@ Use classic `<script>` tags. Avoid `type="module"`.
   widgets do.
 - Remove focus outlines and selection styles. Nothing can be focused or selected anyway.
 
-## 7. Performance
+## 8. Performance
 
 Widgets run all day next to a video wallpaper, so they must be light:
 
@@ -185,7 +266,7 @@ Widgets run all day next to a video wallpaper, so they must be light:
 - When hidden, clear timers and set `animation-play-state: paused` on CSS animations.
 - Keep the DOM small. No video backgrounds or large images unless the user asks for them.
 
-## 8. Template
+## 9. Template
 
 Start from this. It handles settings, visibility, themes and resizing correctly.
 
@@ -267,6 +348,7 @@ Start from this. It handles settings, visibility, themes and resizing correctly.
   "version": "1.0.0",
   "size": { "width": 320, "height": 160, "minWidth": 140, "minHeight": 80, "resizable": true },
   "radius": 24,
+  "permissions": [],
   "settings": [
     { "key": "title", "type": "text", "label": "Title", "placeholder": "Hello", "default": "Hello" },
     { "key": "theme", "type": "select", "label": "Theme", "options": ["dark", "light", "clear"], "default": "dark" }
@@ -274,11 +356,13 @@ Start from this. It handles settings, visibility, themes and resizing correctly.
 }
 ```
 
-## 9. Checklist before you answer
+## 10. Checklist before you answer
 
 - [ ] The folder name uses only `a-z 0-9 - _`.
 - [ ] `widget.json` is valid JSON. Every setting has a unique `key`, a valid `type` and a `default`.
 - [ ] `<script src="/kinora.js"></script>` comes before the code that uses `Kinora`.
+- [ ] Every `Kinora.on(topic)` / `Kinora.notify` has its permission in `widget.json`, and no unused permissions are listed.
+- [ ] The widget renders sensibly before live data arrives, and when `media` is `null`.
 - [ ] No network requests, CDNs or remote fonts. Every asset is in the folder or inline.
 - [ ] No `localStorage`/cookies/`eval`/workers/`type="module"`/popups.
 - [ ] No buttons, hover or inputs. Customisation goes through settings only.

@@ -1,0 +1,17 @@
+{
+  "name": "Break Reminder",
+  "description": "Counts down to your next break and sends a Windows notification when it's time.",
+  "author": "Kinora",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "size": { "width": 170, "height": 170, "minWidth": 120, "minHeight": 120, "resizable": true },
+  "radius": 24,
+  "permissions": ["notifications"],
+  "settings": [
+    { "key": "minutes", "type": "number", "label": "Break every (minutes)", "min": 5, "max": 120, "step": 5, "default": 45 },
+    { "key": "message", "type": "text", "label": "Message", "placeholder": "Time for a break", "default": "Stand up, stretch and rest your eyes for a minute." },
+    { "key": "fullscreen", "type": "toggle", "label": "Remind during fullscreen apps", "default": false },
+    { "key": "theme", "type": "select", "label": "Theme", "options": ["dark", "light", "clear"], "default": "dark" },
+    { "key": "accent", "type": "color", "label": "Accent", "default": "#64d2ff" }
+  ]
+}

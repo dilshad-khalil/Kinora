@@ -1,6 +1,7 @@
 mod commands;
 mod desktop;
 mod monitors;
+mod providers;
 mod state;
 mod tray;
 mod wallpaper;
@@ -23,6 +24,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .manage(AppState::default())
         .register_uri_scheme_protocol(widgets::SCHEME, |ctx, request| {
             widgets::serve(ctx.app_handle(), &request)
@@ -42,6 +44,7 @@ pub fn run() {
             }
 
             widgets::install_built_ins(&handle);
+            widgets::snapshot(&handle); // works out which live data the placed widgets need
             tray::build(&handle)?;
 
             // The control panel is created on demand and destroyed when closed, so it costs
@@ -82,6 +85,7 @@ pub fn run() {
                 }
             });
 
+            providers::spawn(handle.clone());
             watcher::spawn(handle);
             Ok(())
         })
@@ -105,6 +109,8 @@ pub fn run() {
             commands::open_widgets_folder,
             commands::open_widget_editor,
             commands::close_widget_editor,
+            commands::widget_data,
+            commands::widget_notify,
         ])
         .build(tauri::generate_context!())
         .expect("error while building Kinora")

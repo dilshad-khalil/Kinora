@@ -1,0 +1,130 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; }
+      body {
+        --fg: #fff;
+        --dim: rgba(235, 235, 245, 0.6);
+        --track: rgba(255, 255, 255, 0.12);
+        --tint: rgba(28, 28, 30, 0.78);
+        --accent: #30d158;
+        font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+        color: var(--fg);
+      }
+      body.light { --fg: #1c1c1e; --dim: rgba(60, 60, 67, 0.6); --track: rgba(0, 0, 0, 0.08); --tint: rgba(246, 246, 248, 0.86); }
+      body.clear { --tint: transparent; text-shadow: 0 1px 10px rgba(0, 0, 0, 0.5); }
+
+      .tile {
+        box-sizing: border-box;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 6%;
+        padding: 6% 7%;
+        background: var(--tint);
+      }
+      .rings { display: flex; justify-content: space-around; flex: 1; min-height: 0; }
+      .ring { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4%; min-width: 0; flex: 1; }
+      .gauge { position: relative; height: 100%; max-height: 74%; aspect-ratio: 1; }
+      .gauge svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+      .gauge circle { fill: none; stroke-width: 9; stroke-linecap: round; }
+      .gauge .track { stroke: var(--track); }
+      .gauge .bar { stroke: var(--accent); transition: stroke-dashoffset 0.6s ease, stroke 0.3s; }
+      .gauge .bar.hot { stroke: #ff9f0a; }
+      .gauge .bar.crit { stroke: #ff453a; }
+      .gauge .value {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        font-size: min(7.5vh, 4.6vw);
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+      .label { font-size: min(6.5vh, 3.6vw); font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: 0.06em; }
+      .footer {
+        display: flex;
+        justify-content: space-between;
+        font-size: min(7vh, 3.8vw);
+        color: var(--dim);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      .footer b { color: var(--fg); font-weight: 600; }
+      .hidden { display: none; }
+    </style>
+  </head>
+  <body class="dark">
+    <div class="tile">
+      <div class="rings">
+        <div class="ring"><div class="gauge" id="cpu"></div><div class="label">CPU</div></div>
+        <div class="ring"><div class="gauge" id="mem"></div><div class="label">Memory</div></div>
+        <div class="ring"><div class="gauge" id="disk"></div><div class="label" id="diskLabel">Disk</div></div>
+      </div>
+      <div class="footer" id="footer">
+        <span>↓ <b id="down">–</b></span>
+        <span>↑ <b id="up">–</b></span>
+        <span id="battery"></span>
+      </div>
+    </div>
+
+    <script src="/kinora.js"></script>
+    <script>
+      var s = { disk: "C:\\", network: true, theme: "dark", accent: "#30d158" };
+      var R = 40, C = 2 * Math.PI * R;
+
+      // Build the three ring gauges.
+      ["cpu", "mem", "disk"].forEach(function (id) {
+        document.getElementById(id).innerHTML =
+          '<svg viewBox="0 0 100 100"><circle class="track" cx="50" cy="50" r="' + R + '"/>' +
+          '<circle class="bar" cx="50" cy="50" r="' + R + '" stroke-dasharray="' + C + '" stroke-dashoffset="' + C + '"/></svg>' +
+          '<div class="value">–</div>';
+      });
+
+      function setGauge(id, pct) {
+        var el = document.getElementById(id);
+        var bar = el.querySelector(".bar");
+        var p = Math.max(0, Math.min(100, pct || 0));
+        bar.style.strokeDashoffset = C * (1 - p / 100);
+        bar.classList.toggle("hot", p >= 75 && p < 90);
+        bar.classList.toggle("crit", p >= 90);
+        el.querySelector(".value").textContent = Math.round(p) + "%";
+      }
+
+      function speed(bytes) {
+        var units = ["B/s", "KB/s", "MB/s", "GB/s"], i = 0;
+        while (bytes >= 1000 && i < units.length - 1) { bytes /= 1000; i++; }
+        return (i === 0 ? Math.round(bytes) : bytes.toFixed(bytes < 10 ? 1 : 0)) + " " + units[i];
+      }
+
+      function pickDisk(disks) {
+        var want = (s.disk || "").toLowerCase().replace(/\\?$/, "\\");
+        return disks.find(function (d) { return d.mount.toLowerCase() === want; }) || disks[0];
+      }
+
+      Kinora.on("system", function (d) {
+        if (!d) return;
+        setGauge("cpu", d.cpu.usage);
+        setGauge("mem", d.memory.usage);
+        var disk = d.disks.length ? pickDisk(d.disks) : null;
+        setGauge("disk", disk ? disk.usage : 0);
+        document.getElementById("diskLabel").textContent = disk ? disk.mount.replace(/\\$/, "") : "Disk";
+        document.getElementById("down").textContent = speed(d.network.down);
+        document.getElementById("up").textContent = speed(d.network.up);
+        var b = d.battery;
+        document.getElementById("battery").textContent =
+          b && b.percent != null ? (b.charging ? "⚡ " : "🔋 ") + b.percent + "%" : "";
+      });
+
+      Kinora.onSettings(function (next) {
+        s = Object.assign(s, next);
+        document.body.className = s.theme;
+        document.body.style.setProperty("--accent", s.accent);
+        document.getElementById("footer").classList.toggle("hidden", !s.network);
+      });
+    </script>
+  </body>
+</html>

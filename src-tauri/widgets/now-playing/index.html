@@ -1,0 +1,144 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; }
+      body {
+        --fg: #fff;
+        --dim: rgba(235, 235, 245, 0.62);
+        --track: rgba(255, 255, 255, 0.2);
+        --tint: rgba(28, 28, 30, 0.78);
+        font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+        color: var(--fg);
+      }
+      body.light { --fg: #1c1c1e; --dim: rgba(60, 60, 67, 0.62); --track: rgba(0, 0, 0, 0.12); --tint: rgba(246, 246, 248, 0.86); }
+      body.clear { --tint: transparent; text-shadow: 0 1px 10px rgba(0, 0, 0, 0.5); }
+
+      .tile { position: relative; height: 100%; background: var(--tint); overflow: hidden; transition: opacity 0.4s; }
+      .tile.gone { opacity: 0; }
+      /* Blurred artwork behind everything: a small static image, cheap to blur once. */
+      .backdrop {
+        position: absolute;
+        inset: -30%;
+        background-size: cover;
+        background-position: center;
+        filter: blur(28px) saturate(1.4);
+        opacity: 0;
+        transition: opacity 0.6s;
+      }
+      .backdrop.on { opacity: 0.55; }
+      body.light .backdrop.on { opacity: 0.35; }
+      .content {
+        position: relative;
+        box-sizing: border-box;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        gap: 5%;
+        padding: 0 6% 0 calc(min(14vh, 6vw));
+      }
+      .art {
+        height: 72%;
+        aspect-ratio: 1;
+        flex-shrink: 0;
+        border-radius: 12%;
+        background: var(--track) center / cover no-repeat;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+        display: grid;
+        place-items: center;
+        font-size: min(24vh, 10vw);
+        color: var(--dim);
+      }
+      .info { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: min(3vh, 1.4vw); }
+      .app { font-size: min(8.5vh, 3.2vw); font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: 0.06em; }
+      .title, .artist { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .title { font-size: min(15vh, 5.4vw); font-weight: 650; line-height: 1.15; }
+      .artist { font-size: min(11.5vh, 4.2vw); color: var(--dim); }
+      .bar { margin-top: min(4vh, 1.6vw); height: max(3px, 2.6vh); border-radius: 99px; background: var(--track); overflow: hidden; }
+      .bar div { height: 100%; width: 0; background: var(--fg); border-radius: inherit; }
+      .times { display: flex; justify-content: space-between; font-size: min(8vh, 3vw); color: var(--dim); font-variant-numeric: tabular-nums; }
+      .paused .title, .paused .art { opacity: 0.6; }
+      .hidden { display: none !important; }
+    </style>
+  </head>
+  <body class="dark">
+    <div class="tile" id="tile">
+      <div class="backdrop" id="backdrop"></div>
+      <div class="content" id="content">
+        <div class="art" id="art">♪</div>
+        <div class="info">
+          <div class="app" id="app"></div>
+          <div class="title" id="title">Nothing playing</div>
+          <div class="artist" id="artist"></div>
+          <div id="progress">
+            <div class="bar"><div id="fill"></div></div>
+            <div class="times"><span id="pos"></span><span id="dur"></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="/kinora.js"></script>
+    <script>
+      var s = { backdrop: true, progress: true, hideIdle: false, theme: "dark" };
+      var media = null;
+      var timer = 0;
+      var $ = function (id) { return document.getElementById(id); };
+
+      function clock(sec) {
+        sec = Math.max(0, Math.floor(sec));
+        var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), r = String(sec % 60).padStart(2, "0");
+        return h ? h + ":" + String(m).padStart(2, "0") + ":" + r : m + ":" + r;
+      }
+
+      // "Spotify.exe" -> "Spotify", "Microsoft.ZuneMusic_8wekyb3d8bbwe!Microsoft.ZuneMusic" -> "ZuneMusic"
+      function appName(id) {
+        var name = (id || "").split("!").pop().replace(/\.exe$/i, "").split(".").pop();
+        return name === "MSEdge" ? "Edge" : name;
+      }
+
+      // Extrapolate the position between updates.
+      function tickProgress() {
+        clearTimeout(timer);
+        var showBar = media && s.progress && media.duration > 0;
+        $("progress").classList.toggle("hidden", !showBar);
+        if (!showBar) return;
+        var pos = media.position + (media.playing ? (Date.now() - media.updatedAt) / 1000 : 0);
+        pos = Math.min(pos, media.duration);
+        $("fill").style.width = (pos / media.duration) * 100 + "%";
+        $("pos").textContent = clock(pos);
+        $("dur").textContent = "-" + clock(media.duration - pos);
+        if (media.playing && Kinora.visible) timer = setTimeout(tickProgress, 1000 - ((Date.now() - media.updatedAt) % 1000));
+      }
+
+      function render() {
+        var idle = !media || !media.title;
+        $("tile").classList.toggle("gone", idle && s.hideIdle);
+        $("content").classList.toggle("paused", !!media && !media.playing);
+        $("title").textContent = idle ? "Nothing playing" : media.title;
+        $("artist").textContent = idle ? "" : [media.artist, media.album].filter(Boolean).join(" — ");
+        $("app").textContent = idle ? "" : appName(media.app) + (media.playing ? "" : " · Paused");
+        var art = !idle && media.artwork ? 'url("' + media.artwork + '")' : "";
+        $("art").style.backgroundImage = art;
+        $("art").textContent = art ? "" : "♪";
+        $("backdrop").style.backgroundImage = art;
+        $("backdrop").classList.toggle("on", !!art && s.backdrop);
+        tickProgress();
+      }
+
+      Kinora.on("media", function (data) {
+        media = data;
+        render();
+      });
+
+      Kinora.onSettings(function (next) {
+        s = Object.assign(s, next);
+        document.body.className = s.theme;
+        render();
+      });
+
+      Kinora.onVisibility(tickProgress);
+    </script>
+  </body>
+</html>

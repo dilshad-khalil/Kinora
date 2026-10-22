@@ -61,11 +61,28 @@ folders are good starting points. Copy one, rename the folder, and change it.
 </script>
 ```
 
+## Live data and notifications
+
+Declare what a widget uses in `widget.json` with `"permissions": ["system", "media", "notifications"]`.
+Users see these on the widget's card.
+
+```js
+Kinora.on("system", (d) => {});  // every second: d.cpu.usage, d.memory.usage, d.disks, d.network.down/up, d.battery
+Kinora.on("media", (m) => {});   // when it changes: m.title, m.artist, m.album, m.artwork (data URL), m.playing,
+                                 // m.position at m.updatedAt, m.duration. null when nothing is playing
+Kinora.notify("Title", "Body");  // Windows notification, at most one every 10 seconds per widget
+Kinora.onError((message) => {}); // a request was refused
+```
+
+The built-in **System**, **Now Playing** and **Break Reminder** widgets show each one in use,
+and `AI-GUIDE.md` documents every field.
+
 ## What widgets can't do
 
 Widgets run in a locked-down sandbox, so a widget you download can't harm your PC:
 
 - No network access (`fetch`, images or fonts from the internet). Bundle everything in the folder.
+- No reading other apps' notifications or controlling media. The data above is read-only.
 - No access to files outside its own folder, to Kinora, or to other widgets.
 - No popups, navigation, forms, cookies or storage.
 - No clicks: widgets sit behind your desktop icons, so they're for display only.

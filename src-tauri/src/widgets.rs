@@ -5,9 +5,14 @@
 
 use std::{
     borrow::Cow,
+    collections::HashMap,
     fs,
     path::{Path, PathBuf},
-    sync::atomic::{AtomicU32, Ordering},
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Mutex,
+    },
+    time::{Duration, Instant},
 };
 
 use serde::{Deserialize, Serialize};
@@ -16,9 +21,10 @@ use tauri::{
     http::{Request, Response, StatusCode},
     AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindowBuilder,
 };
+use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_store::StoreExt;
 
-use crate::{monitors, state::STORE};
+use crate::{monitors, providers, state::STORE};
 
 pub const SCHEME: &str = "kwidget";
 const ORIGIN: &str = "http://kwidget.localhost";
@@ -38,6 +44,12 @@ const BUILT_IN: &[(&str, &[u8])] = &[
     ("quote/index.html", include_bytes!("../widgets/quote/index.html")),
     ("quote/gilda-display.woff2", include_bytes!("../widgets/quote/gilda-display.woff2")),
     ("quote/OFL.txt", include_bytes!("../widgets/quote/OFL.txt")),
+    ("system/widget.json", include_bytes!("../widgets/system/widget.json")),
+    ("system/index.html", include_bytes!("../widgets/system/index.html")),
+    ("now-playing/widget.json", include_bytes!("../widgets/now-playing/widget.json")),
+    ("now-playing/index.html", include_bytes!("../widgets/now-playing/index.html")),
+    ("break-reminder/widget.json", include_bytes!("../widgets/break-reminder/widget.json")),
+    ("break-reminder/index.html", include_bytes!("../widgets/break-reminder/index.html")),
 ];
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -71,6 +83,8 @@ pub struct Manifest {
     pub radius: f64,
     /// Settings shown in the control panel, passed to the widget as `{ key: value }`.
     pub settings: Vec<Value>,
+    /// Data and actions the widget may use: "system", "media", "notifications".
+    pub permissions: Vec<String>,
 }
 
 impl Default for Manifest {
@@ -85,6 +99,7 @@ impl Default for Manifest {
             glass: false,
             radius: 0.0,
             settings: Vec::new(),
+            permissions: Vec::new(),
         }
     }
 }
@@ -187,6 +202,7 @@ fn read_widget(folder: &Path) -> Option<Widget> {
     if manifest.name.is_empty() {
         manifest.name = id.clone();
     }
+    manifest.permissions.retain(|p| providers::PERMISSIONS.contains(&p.as_str()));
     if error.is_none() && !folder.join(&manifest.entry).is_file() {
         error = Some(format!("{} is missing", manifest.entry));
     }
@@ -213,11 +229,50 @@ pub fn has_instances(app: &AppHandle) -> bool {
 }
 
 pub fn snapshot(app: &AppHandle) -> WidgetsState {
-    WidgetsState {
+    let s = WidgetsState {
         widgets: list(app),
         instances: instances(app),
         revision: REVISION.load(Ordering::Relaxed),
+    };
+    // Sample only what a placed widget may read.
+    let needed = s
+        .instances
+        .iter()
+        .filter_map(|i| s.widgets.iter().find(|w| w.id == i.widget))
+        .flat_map(|w| w.manifest.permissions.iter().cloned())
+        .collect();
+    providers::set_needed(needed);
+    s
+}
+
+/// Show a Windows notification for a placed widget that declared the permission.
+/// One per widget every 10 seconds, so a buggy widget can't flood the user.
+pub fn notify_from(app: &AppHandle, instance: &str, title: &str, body: &str) -> Result<(), String> {
+    static LAST: Mutex<Option<HashMap<String, Instant>>> = Mutex::new(None);
+
+    let inst = instances(app).into_iter().find(|i| i.id == instance).ok_or("Widget not on the desktop.")?;
+    let widget = list(app).into_iter().find(|w| w.id == inst.widget).ok_or("Widget not installed.")?;
+    if !widget.manifest.permissions.iter().any(|p| p == providers::NOTIFICATIONS) {
+        return Err("This widget doesn't have the notifications permission.".into());
     }
+    {
+        let mut last = LAST.lock().unwrap();
+        let last = last.get_or_insert_with(HashMap::new);
+        if last.get(instance).is_some_and(|t| t.elapsed() < Duration::from_secs(10)) {
+            return Err("Too many notifications; wait 10 seconds.".into());
+        }
+        last.insert(instance.to_string(), Instant::now());
+    }
+
+    let clip = |s: &str, n: usize| s.chars().take(n).collect::<String>();
+    let title = clip(title.trim(), 80);
+    let title = if title.is_empty() { widget.manifest.name.clone() } else { title };
+    app.notification()
+        .builder()
+        .title(title)
+        .body(clip(body.trim(), 300))
+        .show()
+        .map_err(|e| e.to_string())
 }
 
 /// Save the placed widgets and tell every window.

@@ -1,0 +1,16 @@
+{
+  "name": "Now Playing",
+  "description": "The song or video playing in Spotify, your browser or any media app, with artwork.",
+  "author": "Kinora",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "size": { "width": 380, "height": 140, "minWidth": 240, "minHeight": 90, "resizable": true },
+  "radius": 24,
+  "permissions": ["media"],
+  "settings": [
+    { "key": "backdrop", "type": "toggle", "label": "Artwork backdrop", "default": true },
+    { "key": "progress", "type": "toggle", "label": "Show progress", "default": true },
+    { "key": "hideIdle", "type": "toggle", "label": "Hide when nothing is playing", "default": false },
+    { "key": "theme", "type": "select", "label": "Theme", "options": ["dark", "light", "clear"], "default": "dark" }
+  ]
+}

@@ -26,6 +26,7 @@ import {
 import { IconButton } from "@/components/icon-button";
 import { WidgetFrame } from "@/components/widget-frame";
 import { WidgetSettings } from "@/components/widget-settings";
+import { Permissions } from "@/components/widget-permissions";
 import aiGuide from "../../src-tauri/widgets/AI-GUIDE.md?raw";
 import { BUILT_IN_WIDGETS, useWidgets, widgetCommands, type Widget } from "@/lib/widgets";
 
@@ -206,6 +207,7 @@ export function WidgetsPanel() {
                 )}
               </div>
               {w.description && <p className="line-clamp-2 text-xs text-muted-foreground">{w.description}</p>}
+              <Permissions widget={w} className="mt-1.5" />
             </motion.div>
           ))}
         </div>

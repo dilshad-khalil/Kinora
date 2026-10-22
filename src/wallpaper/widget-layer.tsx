@@ -34,6 +34,7 @@ export function WidgetLayer({ regions }: { regions: Region[] }) {
             instance={inst}
             revision={revision}
             visible={visible}
+            actions
             style={{ left: r.left + rect.x, top: r.top + rect.y, width: rect.width, height: rect.height }}
           />
         );

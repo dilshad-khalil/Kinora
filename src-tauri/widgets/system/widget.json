@@ -1,0 +1,16 @@
+{
+  "name": "System",
+  "description": "CPU, memory and disk at a glance, with network speed and battery.",
+  "author": "Kinora",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "size": { "width": 340, "height": 170, "minWidth": 220, "minHeight": 110, "resizable": true },
+  "radius": 24,
+  "permissions": ["system"],
+  "settings": [
+    { "key": "disk", "type": "text", "label": "Disk", "placeholder": "C:\\", "default": "C:\\" },
+    { "key": "network", "type": "toggle", "label": "Show network and battery", "default": true },
+    { "key": "theme", "type": "select", "label": "Theme", "options": ["dark", "light", "clear"], "default": "dark" },
+    { "key": "accent", "type": "color", "label": "Accent", "default": "#30d158" }
+  ]
+}
