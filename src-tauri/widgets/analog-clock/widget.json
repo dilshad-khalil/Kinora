@@ -1,0 +1,18 @@
+{
+  "name": "Analog Clock",
+  "description": "A classic clock face with a sweeping second hand. Animated entirely in CSS.",
+  "author": "Kinora",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "size": { "width": 170, "height": 170, "minWidth": 90, "minHeight": 90, "resizable": true },
+  "radius": 24,
+  "permissions": [],
+  "settings": [
+    { "key": "face", "type": "select", "label": "Face", "options": ["dark", "light", "clear"], "default": "light" },
+    { "key": "numbers", "type": "toggle", "label": "Show numbers", "default": true },
+    { "key": "sweep", "type": "select", "label": "Second hand", "options": ["sweep", "tick", "hidden"], "default": "sweep" },
+    { "key": "accent", "type": "color", "label": "Second hand color", "default": "#ff9f0a" },
+    { "key": "timeZone", "type": "text", "label": "Time zone", "placeholder": "Local, or e.g. Asia/Tokyo", "default": "" },
+    { "key": "label", "type": "text", "label": "Label", "placeholder": "e.g. Tokyo", "default": "" }
+  ]
+}

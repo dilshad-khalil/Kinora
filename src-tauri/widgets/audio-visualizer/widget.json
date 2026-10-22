@@ -1,0 +1,17 @@
+{
+  "name": "Audio Visualizer",
+  "description": "Bars that dance to whatever your PC is playing. Driven by real-time audio levels.",
+  "author": "Kinora",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "size": { "width": 380, "height": 150, "minWidth": 160, "minHeight": 60, "resizable": true },
+  "radius": 24,
+  "permissions": ["audio"],
+  "settings": [
+    { "key": "bars", "type": "number", "label": "Bars", "min": 8, "max": 96, "step": 4, "default": 40 },
+    { "key": "style", "type": "select", "label": "Style", "options": ["bars", "mirror", "dots"], "default": "mirror" },
+    { "key": "color", "type": "color", "label": "Color", "default": "#64d2ff" },
+    { "key": "color2", "type": "color", "label": "Second color", "default": "#bf5af2" },
+    { "key": "background", "type": "toggle", "label": "Background", "default": false }
+  ]
+}

@@ -49,7 +49,22 @@ const BUILT_IN: &[(&str, &[u8])] = &[
     ("now-playing/widget.json", include_bytes!("../widgets/now-playing/widget.json")),
     ("now-playing/index.html", include_bytes!("../widgets/now-playing/index.html")),
     ("break-reminder/widget.json", include_bytes!("../widgets/break-reminder/widget.json")),
-    ("break-reminder/index.html", include_bytes!("../widgets/break-reminder/index.html")),
+    ("break-reminder/index.html", include_bytes!("../widgets/break-reminder/index.html")),    ("lyrics/widget.json", include_bytes!("../widgets/lyrics/widget.json")),
+    ("lyrics/index.html", include_bytes!("../widgets/lyrics/index.html")),
+    ("audio-visualizer/widget.json", include_bytes!("../widgets/audio-visualizer/widget.json")),
+    ("audio-visualizer/index.html", include_bytes!("../widgets/audio-visualizer/index.html")),
+    ("analog-clock/widget.json", include_bytes!("../widgets/analog-clock/widget.json")),
+    ("analog-clock/index.html", include_bytes!("../widgets/analog-clock/index.html")),
+    ("calendar/widget.json", include_bytes!("../widgets/calendar/widget.json")),
+    ("calendar/index.html", include_bytes!("../widgets/calendar/index.html")),
+    ("activity-graph/widget.json", include_bytes!("../widgets/activity-graph/widget.json")),
+    ("activity-graph/index.html", include_bytes!("../widgets/activity-graph/index.html")),
+    ("sticky-note/widget.json", include_bytes!("../widgets/sticky-note/widget.json")),
+    ("sticky-note/index.html", include_bytes!("../widgets/sticky-note/index.html")),
+    ("sticky-note/caveat.woff2", include_bytes!("../widgets/sticky-note/caveat.woff2")),
+    ("sticky-note/OFL.txt", include_bytes!("../widgets/sticky-note/OFL.txt")),
+    ("countdown/widget.json", include_bytes!("../widgets/countdown/widget.json")),
+    ("countdown/index.html", include_bytes!("../widgets/countdown/index.html")),
 ];
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

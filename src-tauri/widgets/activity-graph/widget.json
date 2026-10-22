@@ -1,0 +1,16 @@
+{
+  "name": "Activity Graph",
+  "description": "A live chart of CPU, memory or network activity over the last few minutes.",
+  "author": "Kinora",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "size": { "width": 340, "height": 150, "minWidth": 180, "minHeight": 90, "resizable": true },
+  "radius": 24,
+  "permissions": ["system"],
+  "settings": [
+    { "key": "metric", "type": "select", "label": "Show", "options": ["cpu", "memory", "network"], "default": "cpu" },
+    { "key": "seconds", "type": "number", "label": "History (seconds)", "min": 30, "max": 600, "step": 30, "default": 120 },
+    { "key": "color", "type": "color", "label": "Color", "default": "#0a84ff" },
+    { "key": "theme", "type": "select", "label": "Theme", "options": ["dark", "light", "clear"], "default": "dark" }
+  ]
+}

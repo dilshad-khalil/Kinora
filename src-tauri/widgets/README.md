@@ -63,18 +63,22 @@ folders are good starting points. Copy one, rename the folder, and change it.
 
 ## Live data and notifications
 
-Declare what a widget uses in `widget.json` with `"permissions": ["system", "media", "notifications"]`.
+Declare what a widget uses in `widget.json` with `"permissions": ["system", "media", "lyrics", "audio", "notifications"]`.
 Users see these on the widget's card.
 
 ```js
 Kinora.on("system", (d) => {});  // every second: d.cpu.usage, d.memory.usage, d.disks, d.network.down/up, d.battery
 Kinora.on("media", (m) => {});   // when it changes: m.title, m.artist, m.album, m.artwork (data URL), m.playing,
                                  // m.position at m.updatedAt, m.duration. null when nothing is playing
+Kinora.on("lyrics", (l) => {});  // per track: l.synced [{time, text}] or l.plain, from lrclib.net (also request "media")
+Kinora.on("audio", (a) => {});   // ~30/s while sound plays: a.peak, a.left, a.right (0-1)
 Kinora.notify("Title", "Body");  // Windows notification, at most one every 10 seconds per widget
 Kinora.onError((message) => {}); // a request was refused
 ```
 
-The built-in **System**, **Now Playing** and **Break Reminder** widgets show each one in use,
+The built-in widgets show each one in use: **System** and **Activity Graph** (system),
+**Now Playing** (media), **Lyrics** (media + lyrics), **Audio Visualizer** (audio), and
+**Break Reminder** and **Countdown** (notifications).
 and `AI-GUIDE.md` documents every field.
 
 ## What widgets can't do

@@ -1,5 +1,7 @@
+mod audio;
 mod commands;
 mod desktop;
+mod lyrics;
 mod monitors;
 mod providers;
 mod state;

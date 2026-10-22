@@ -1,0 +1,17 @@
+{
+  "name": "Lyrics",
+  "description": "Time-synced lyrics for the song that's playing, from lrclib.net.",
+  "author": "Kinora",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "size": { "width": 440, "height": 260, "minWidth": 240, "minHeight": 120, "resizable": true },
+  "radius": 24,
+  "permissions": ["media", "lyrics"],
+  "settings": [
+    { "key": "header", "type": "toggle", "label": "Show song and artist", "default": true },
+    { "key": "backdrop", "type": "toggle", "label": "Artwork backdrop", "default": true },
+    { "key": "align", "type": "select", "label": "Alignment", "options": ["left", "center"], "default": "left" },
+    { "key": "scale", "type": "number", "label": "Text size (%)", "min": 60, "max": 160, "step": 5, "default": 100 },
+    { "key": "theme", "type": "select", "label": "Theme", "options": ["dark", "light", "clear"], "default": "dark" }
+  ]
+}

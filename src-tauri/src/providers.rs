@@ -27,8 +27,10 @@ use crate::state::{self, AppState};
 
 pub const SYSTEM: &str = "system";
 pub const MEDIA: &str = "media";
+pub const LYRICS: &str = "lyrics";
+pub const AUDIO: &str = "audio";
 pub const NOTIFICATIONS: &str = "notifications";
-pub const PERMISSIONS: &[&str] = &[SYSTEM, MEDIA, NOTIFICATIONS];
+pub const PERMISSIONS: &[&str] = &[SYSTEM, MEDIA, LYRICS, AUDIO, NOTIFICATIONS];
 
 /// Topics some placed widget is allowed to read.
 static NEEDED: Mutex<Option<HashSet<String>>> = Mutex::new(None);
@@ -43,30 +45,44 @@ pub fn latest(topic: &str) -> Option<Value> {
     LATEST.lock().unwrap().as_ref()?.get(topic).cloned()
 }
 
-fn publish(app: &AppHandle, topic: &str, data: Value) {
+pub fn publish(app: &AppHandle, topic: &str, data: Value) {
     LATEST.lock().unwrap().get_or_insert_with(HashMap::new).insert(topic.into(), data.clone());
     let _ = app.emit("widgets:data", json!({ "topic": topic, "data": data }));
 }
 
+/// Whether the widgets are on screen.
+fn shown(app: &AppHandle) -> bool {
+    app.state::<AppState>().runtime.lock().unwrap().host.is_some() && !state::snapshot(app).auto_paused
+}
+
+/// A placed widget may read `topic` and the widgets are on screen.
+pub fn wanted(app: &AppHandle, topic: &str) -> bool {
+    NEEDED.lock().unwrap().as_ref().is_some_and(|n| n.contains(topic)) && shown(app)
+}
+
 pub fn spawn(app: AppHandle) {
+    crate::audio::spawn(app.clone());
     thread::spawn(move || {
         let mut system = SystemSampler::new();
         let mut media = MediaSampler::default();
         loop {
             thread::sleep(Duration::from_secs(1));
             // Only while the widgets are on screen.
-            let shown = app.state::<AppState>().runtime.lock().unwrap().host.is_some()
-                && !state::snapshot(&app).auto_paused;
             let needed = NEEDED.lock().unwrap().clone().unwrap_or_default();
-            if !shown {
+            if !shown(&app) {
                 continue;
             }
             if needed.contains(SYSTEM) {
                 publish(&app, SYSTEM, system.sample());
             }
-            if needed.contains(MEDIA) {
+            // Lyrics follow the media topic, so sample media for either.
+            if needed.contains(MEDIA) || needed.contains(LYRICS) {
                 if let Some(data) = media.sample() {
                     publish(&app, MEDIA, data);
+                }
+                if needed.contains(LYRICS) {
+                    let now = latest(MEDIA).unwrap_or(Value::Null);
+                    crate::lyrics::track_changed(&app, &now);
                 }
             }
         }

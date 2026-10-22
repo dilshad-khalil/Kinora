@@ -2,11 +2,13 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
 /** Topics a widget can subscribe to (each needs the same-named permission). */
-export const DATA_TOPICS = ["system", "media"] as const;
+export const DATA_TOPICS = ["system", "media", "lyrics", "audio"] as const;
 
 export const PERMISSION_LABELS: Record<string, string> = {
   system: "System stats",
   media: "Now playing",
+  lyrics: "Lyrics (lrclib.net)",
+  audio: "Audio levels",
   notifications: "Notifications",
 };
 

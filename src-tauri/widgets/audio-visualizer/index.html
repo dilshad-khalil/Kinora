@@ -1,0 +1,128 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; }
+      body.bg { background: rgba(28, 28, 30, 0.72); }
+      canvas { display: block; width: 100%; height: 100%; }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+
+    <script src="/kinora.js"></script>
+    <script>
+      // Windows only gives loudness (left/right peaks), not frequencies, so each bar gets its own
+      // fixed "voice" (a curve plus a wobble) scaled by the current loudness.
+      var s = { bars: 40, style: "mirror", color: "#64d2ff", color2: "#bf5af2", background: false };
+      var canvas = document.getElementById("c");
+      var ctx = canvas.getContext("2d");
+      var level = { left: 0, right: 0 };   // latest from Kinora
+      var heights = [];                    // what's drawn, eased towards the target
+      var voices = [];
+      var frame = 0, running = false;
+
+      function makeVoices() {
+        var n = Math.max(4, Math.round(Number(s.bars) || 40));
+        voices = [];
+        for (var i = 0; i < n; i++) {
+          var x = i / (n - 1);
+          voices.push({
+            weight: 0.45 + 0.55 * Math.exp(-Math.pow((x - 0.3) / 0.35, 2)), // fuller in the lows/mids
+            speed: 1.3 + ((i * 7919) % 13) / 4,
+            phase: (i * 2.399) % (Math.PI * 2),
+          });
+        }
+        heights = voices.map(function () { return 0; });
+      }
+
+      function resize() {
+        var dpr = devicePixelRatio || 1;
+        canvas.width = Math.round(innerWidth * dpr);
+        canvas.height = Math.round(innerHeight * dpr);
+        draw(performance.now());
+      }
+
+      function draw(now) {
+        var w = canvas.width, h = canvas.height, n = voices.length;
+        var t = now / 1000, moving = false;
+        ctx.clearRect(0, 0, w, h);
+        var grad = ctx.createLinearGradient(0, 0, w, 0);
+        grad.addColorStop(0, s.color);
+        grad.addColorStop(1, s.color2);
+        ctx.fillStyle = grad;
+
+        var pad = w * 0.06, gap = (w - pad * 2) / n, bw = Math.max(1, gap * 0.62);
+        for (var i = 0; i < n; i++) {
+          var v = voices[i];
+          var peak = i < n / 2 ? level.left : level.right;
+          var wobble = 0.55 + 0.45 * Math.sin(t * v.speed + v.phase) * Math.sin(t * v.speed * 0.37 + v.phase * 2);
+          var target = Math.min(1, Math.pow(peak, 0.6) * v.weight * wobble * 1.5);
+          // Rise fast, fall slowly, like a real meter.
+          heights[i] += (target - heights[i]) * (target > heights[i] ? 0.55 : 0.12);
+          if (heights[i] > 0.004) moving = true;
+
+          var x = pad + i * gap + (gap - bw) / 2;
+          var bh = Math.max(bw * 0.6, heights[i] * h * 0.84);
+          if (s.style === "dots") {
+            var r = bw / 2, steps = Math.max(1, Math.round(bh / (bw * 1.5)));
+            for (var k = 0; k < steps; k++) {
+              ctx.beginPath();
+              ctx.arc(x + r, h - h * 0.08 - r - k * bw * 1.5, r, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          } else {
+            var y = s.style === "mirror" ? (h - bh) / 2 : h - h * 0.08 - bh;
+            ctx.beginPath();
+            ctx.roundRect(x, y, bw, bh, bw / 2);
+            ctx.fill();
+          }
+        }
+        return moving;
+      }
+
+      // Animate only while there's something to show, and never while hidden.
+      function loop(now) {
+        var moving = draw(now);
+        if (Kinora.visible && (moving || level.left > 0.001 || level.right > 0.001)) {
+          frame = requestAnimationFrame(loop);
+        } else {
+          running = false;
+        }
+      }
+
+      function wake() {
+        if (!running && Kinora.visible) {
+          running = true;
+          frame = requestAnimationFrame(loop);
+        }
+      }
+
+      Kinora.on("audio", function (a) {
+        level = a || { left: 0, right: 0 };
+        wake();
+      });
+
+      Kinora.onSettings(function (next) {
+        s = Object.assign(s, next);
+        document.body.className = s.background ? "bg" : "";
+        makeVoices();
+        resize();
+      });
+
+      Kinora.onVisibility(function (visible) {
+        if (!visible) {
+          cancelAnimationFrame(frame);
+          running = false;
+        } else {
+          wake();
+        }
+      });
+
+      addEventListener("resize", resize);
+      makeVoices();
+      resize();
+    </script>
+  </body>
+</html>

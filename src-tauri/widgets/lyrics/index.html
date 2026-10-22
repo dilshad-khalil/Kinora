@@ -1,0 +1,186 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; }
+      body {
+        --fg: #fff;
+        --dim: rgba(235, 235, 245, 0.38);
+        --tint: rgba(28, 28, 30, 0.8);
+        --scale: 1;
+        font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+        color: var(--fg);
+      }
+      body.light { --fg: #1c1c1e; --dim: rgba(60, 60, 67, 0.4); --tint: rgba(246, 246, 248, 0.88); }
+      body.clear { --tint: transparent; text-shadow: 0 1px 12px rgba(0, 0, 0, 0.6); }
+
+      .tile { position: relative; box-sizing: border-box; height: 100%; display: flex; flex-direction: column; background: var(--tint); overflow: hidden; }
+      .backdrop { position: absolute; inset: -30%; background: center / cover; filter: blur(32px) saturate(1.5); opacity: 0; transition: opacity 0.6s; }
+      .backdrop.on { opacity: 0.45; }
+      body.light .backdrop.on { opacity: 0.3; }
+
+      .header { position: relative; display: flex; align-items: center; gap: 10px; padding: 14px 18px 0; }
+      .art { width: 34px; height: 34px; border-radius: 7px; background: rgba(127, 127, 127, 0.3) center / cover; flex-shrink: 0; }
+      .meta { min-width: 0; }
+      .meta div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .song { font-size: 13px; font-weight: 650; }
+      .artist { font-size: 12px; color: var(--dim); }
+
+      .viewport {
+        position: relative;
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+        -webkit-mask-image: linear-gradient(transparent, #000 22%, #000 70%, transparent);
+        mask-image: linear-gradient(transparent, #000 22%, #000 70%, transparent);
+      }
+      .lines { position: absolute; left: 0; right: 0; top: 0; padding: 0 18px; transition: transform 0.55s cubic-bezier(0.2, 0.7, 0.2, 1); }
+      .line {
+        font-size: calc(min(10vh, 5.2vw) * var(--scale));
+        font-weight: 700;
+        line-height: 1.25;
+        padding: 0.18em 0;
+        color: var(--dim);
+        transition: color 0.3s, transform 0.3s;
+        transform-origin: left center;
+      }
+      body.center .line { text-align: center; transform-origin: center; }
+      .line.active { color: var(--fg); transform: scale(1.04); }
+      .plain .line { color: var(--fg); opacity: 0.75; font-weight: 600; }
+      .message { position: absolute; inset: 0; display: grid; place-items: center; padding: 0 24px; text-align: center; color: var(--dim); font-size: calc(min(9vh, 4.6vw) * var(--scale)); font-weight: 600; }
+      .hidden { display: none !important; }
+    </style>
+  </head>
+  <body class="dark">
+    <div class="tile">
+      <div class="backdrop" id="backdrop"></div>
+      <div class="header" id="header">
+        <div class="art" id="art"></div>
+        <div class="meta"><div class="song" id="song">Lyrics</div><div class="artist" id="artist"></div></div>
+      </div>
+      <div class="viewport" id="viewport">
+        <div class="lines" id="lines"></div>
+        <div class="message" id="message">Play something to see its lyrics</div>
+      </div>
+    </div>
+
+    <script src="/kinora.js"></script>
+    <script>
+      var s = { header: true, backdrop: true, align: "left", scale: 100, theme: "dark" };
+      var media = null, lyrics = null;
+      var lineEls = [], times = [], active = -1, mode = "", timer = 0;
+      var $ = function (id) { return document.getElementById(id); };
+
+      function position() {
+        if (!media) return 0;
+        return media.position + (media.playing ? (Date.now() - media.updatedAt) / 1000 : 0);
+      }
+
+      function message(text) {
+        $("message").textContent = text;
+        $("message").classList.toggle("hidden", !text);
+        $("lines").classList.toggle("hidden", !!text);
+      }
+
+      // Rebuild the line list when the lyrics change.
+      function build() {
+        var lines = $("lines");
+        lines.innerHTML = "";
+        lineEls = []; times = []; active = -1; mode = "";
+        var playing = media && media.title;
+        if (!playing) return message("Play something to see its lyrics");
+        if (!lyrics || lyrics.title !== media.title || lyrics.status === "loading") return message("Looking for lyrics…");
+        if (lyrics.instrumental) return message("♪ Instrumental");
+        if (lyrics.synced && lyrics.synced.length) {
+          mode = "synced";
+          lyrics.synced.forEach(function (l) {
+            var el = document.createElement("div");
+            el.className = "line";
+            el.textContent = l.text || "♪";
+            lines.appendChild(el);
+            lineEls.push(el);
+            times.push(l.time);
+          });
+        } else if (lyrics.plain) {
+          mode = "plain";
+          lyrics.plain.split("\n").forEach(function (t) {
+            var el = document.createElement("div");
+            el.className = "line";
+            el.textContent = t || " ";
+            lines.appendChild(el);
+            lineEls.push(el);
+          });
+        } else {
+          return message("No lyrics found for this song");
+        }
+        lines.className = "lines " + mode;
+        message("");
+      }
+
+      // Move to the current line, then sleep until the next one starts.
+      function sync() {
+        clearTimeout(timer);
+        if (!lineEls.length || !Kinora.visible) return;
+        var pos = position();
+        var view = $("viewport").clientHeight;
+        if (mode === "synced") {
+          var i = -1;
+          while (i + 1 < times.length && times[i + 1] <= pos + 0.15) i++;
+          if (i !== active) {
+            if (lineEls[active]) lineEls[active].classList.remove("active");
+            if (lineEls[i]) lineEls[i].classList.add("active");
+            active = i;
+          }
+          var el = lineEls[Math.max(0, i)];
+          var y = view * 0.4 - (el.offsetTop + el.offsetHeight / 2);
+          $("lines").style.transform = "translateY(" + Math.min(view * 0.4, y) + "px)";
+          if (media.playing && i + 1 < times.length) {
+            timer = setTimeout(sync, Math.max(50, (times[i + 1] - pos - 0.1) * 1000));
+          }
+        } else {
+          // Unsynced: scroll through the text in proportion to the song's progress.
+          var total = $("lines").scrollHeight - view;
+          var f = media.duration > 0 ? Math.min(1, pos / media.duration) : 0;
+          $("lines").style.transform = "translateY(" + -Math.max(0, total) * f + "px)";
+          if (media.playing) timer = setTimeout(sync, 1000);
+        }
+      }
+
+      function renderHeader() {
+        var art = media && media.artwork ? 'url("' + media.artwork + '")' : "";
+        $("art").style.backgroundImage = art;
+        $("backdrop").style.backgroundImage = art;
+        $("backdrop").classList.toggle("on", !!art && s.backdrop);
+        $("song").textContent = media && media.title ? media.title : "Lyrics";
+        $("artist").textContent = media && media.title ? media.artist : "";
+        $("header").classList.toggle("hidden", !s.header);
+      }
+
+      Kinora.on("media", function (m) {
+        var trackChanged = !media || !m || media.title !== m.title || media.artist !== m.artist;
+        media = m;
+        renderHeader();
+        if (trackChanged) build();
+        sync();
+      });
+
+      Kinora.on("lyrics", function (l) {
+        lyrics = l;
+        build();
+        sync();
+      });
+
+      Kinora.onSettings(function (next) {
+        s = Object.assign(s, next);
+        document.body.className = s.theme + (s.align === "center" ? " center" : "");
+        document.body.style.setProperty("--scale", (Number(s.scale) || 100) / 100);
+        renderHeader();
+        requestAnimationFrame(sync); // layout changed
+      });
+
+      Kinora.onVisibility(sync);
+      addEventListener("resize", sync);
+    </script>
+  </body>
+</html>

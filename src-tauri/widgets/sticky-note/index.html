@@ -1,0 +1,99 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      @font-face {
+        font-family: "Caveat";
+        src: url("caveat.woff2") format("woff2");
+        font-weight: 400 700;
+        font-display: block;
+      }
+      html, body { margin: 0; height: 100%; overflow: hidden; }
+      body { --paper: #fff59d; --ink: #3e3a2a; --tilt: -2deg; display: grid; place-items: center; }
+      body.pink { --paper: #f8bbd0; --ink: #4a2a35; }
+      body.blue { --paper: #b3e5fc; --ink: #1f3a4a; }
+      body.green { --paper: #c5e1a5; --ink: #2b3d1f; }
+
+      /* Slightly smaller than the widget so the tilt and shadow stay inside it. */
+      .note {
+        position: relative;
+        box-sizing: border-box;
+        width: 88%;
+        height: 86%;
+        padding: 14% 10% 8%;
+        background: linear-gradient(170deg, rgba(255, 255, 255, 0.35), transparent 40%), var(--paper);
+        color: var(--ink);
+        box-shadow: 0 10px 18px -8px rgba(0, 0, 0, 0.55), 0 2px 4px rgba(0, 0, 0, 0.2);
+        transform: rotate(var(--tilt));
+        border-radius: 2px 2px 3px 18px / 2px 2px 3px 10px;
+        overflow: hidden;
+      }
+      .note.ruled {
+        background:
+          repeating-linear-gradient(transparent 0 calc(1.15em - 1px), rgba(60, 90, 160, 0.22) calc(1.15em - 1px) 1.15em),
+          var(--paper);
+        background-position: 0 calc(14% - 0.1em);
+      }
+      .tape {
+        position: absolute;
+        top: -2%;
+        left: 50%;
+        width: 34%;
+        height: 12%;
+        transform: translateX(-50%) rotate(-3deg);
+        background: rgba(255, 255, 255, 0.55);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+      }
+      .text {
+        font-family: "Caveat", "Segoe Print", cursive;
+        font-weight: 600;
+        line-height: 1.15;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .hidden { display: none; }
+    </style>
+  </head>
+  <body class="yellow">
+    <div class="note" id="note">
+      <div class="tape" id="tape"></div>
+      <div class="text" id="text"></div>
+    </div>
+
+    <script src="/kinora.js"></script>
+    <script>
+      var s = { text: "Ship the widgets | Call mom | Water the plants", paper: "yellow", tape: true, tilt: -2, lines: false };
+      var note = document.getElementById("note"), text = document.getElementById("text");
+
+      // Largest font size at which the note still fits.
+      function fit() {
+        var lo = 8, hi = Math.max(16, note.clientHeight * 0.3), size = hi;
+        text.style.fontSize = hi + "px";
+        if (note.scrollHeight > note.clientHeight) {
+          while (hi - lo > 0.5) {
+            var mid = (lo + hi) / 2;
+            text.style.fontSize = mid + "px";
+            if (note.scrollHeight <= note.clientHeight) lo = mid; else hi = mid;
+          }
+          size = lo;
+        }
+        text.style.fontSize = size + "px";
+        note.style.fontSize = size + "px"; // ruled lines follow the text size
+      }
+
+      Kinora.onSettings(function (next) {
+        s = Object.assign(s, next);
+        document.body.className = s.paper;
+        document.body.style.setProperty("--tilt", (Number(s.tilt) || 0) + "deg");
+        document.getElementById("tape").classList.toggle("hidden", !s.tape);
+        note.classList.toggle("ruled", !!s.lines);
+        text.textContent = String(s.text || "").split("|").map(function (l) { return l.trim(); }).join("\n");
+        fit();
+      });
+
+      addEventListener("resize", fit);
+      document.fonts.ready.then(fit);
+    </script>
+  </body>
+</html>

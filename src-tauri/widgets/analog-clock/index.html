@@ -1,0 +1,115 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; }
+      body {
+        --tint: rgba(28, 28, 30, 0.78);
+        --face: #1c1c1e;
+        --ink: #f2f2f7;
+        --minor: rgba(242, 242, 247, 0.35);
+        --accent: #ff9f0a;
+        font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+      }
+      body.light { --tint: rgba(28, 28, 30, 0.78); --face: #f5f5f7; --ink: #1c1c1e; --minor: rgba(28, 28, 30, 0.35); }
+      body.clear { --tint: transparent; --face: transparent; --ink: #fff; --minor: rgba(255, 255, 255, 0.55); }
+      body.clear svg { filter: drop-shadow(0 1px 6px rgba(0, 0, 0, 0.5)); }
+
+      .tile { height: 100%; display: grid; place-items: center; background: var(--tint); }
+      svg { width: 92%; height: 92%; }
+      .face { fill: var(--face); }
+      .tick { stroke: var(--minor); stroke-width: 1; stroke-linecap: round; }
+      .tick.major { stroke: var(--ink); stroke-width: 2.2; }
+      .num { fill: var(--ink); font-size: 11px; font-weight: 600; text-anchor: middle; dominant-baseline: central; }
+      .label { fill: var(--minor); font-size: 7px; font-weight: 700; letter-spacing: 0.08em; text-anchor: middle; text-transform: uppercase; }
+      .hand { transform-origin: 50px 50px; animation-timing-function: linear; animation-iteration-count: infinite; animation-name: spin; }
+      .hour { stroke: var(--ink); stroke-width: 3.4; stroke-linecap: round; animation-duration: 43200s; }
+      .minute { stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; animation-duration: 3600s; }
+      .second { stroke: var(--accent); stroke-width: 1; stroke-linecap: round; animation-duration: 60s; }
+      .second.tick-mode { animation-timing-function: steps(60); }
+      .cap { fill: var(--ink); }
+      .cap2 { fill: var(--accent); }
+      .paused .hand { animation-play-state: paused; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body class="light">
+    <div class="tile">
+      <svg viewBox="0 0 100 100" id="svg">
+        <circle class="face" cx="50" cy="50" r="48" />
+        <g id="ticks"></g>
+        <g id="nums"></g>
+        <text class="label" id="label" x="50" y="67"></text>
+        <line class="hand hour" id="hour" x1="50" y1="54" x2="50" y2="27" />
+        <line class="hand minute" id="minute" x1="50" y1="56" x2="50" y2="13" />
+        <circle class="cap" cx="50" cy="50" r="2.6" />
+        <line class="hand second" id="second" x1="50" y1="60" x2="50" y2="9" />
+        <circle class="cap2" cx="50" cy="50" r="1.3" />
+      </svg>
+    </div>
+
+    <script src="/kinora.js"></script>
+    <script>
+      var s = { face: "light", numbers: true, sweep: "sweep", accent: "#ff9f0a", timeZone: "", label: "" };
+      var NS = "http://www.w3.org/2000/svg";
+
+      // Ticks and numbers, drawn once.
+      for (var i = 0; i < 60; i++) {
+        var a = (i / 60) * Math.PI * 2, major = i % 5 === 0;
+        var r1 = major ? 41 : 43.5, r2 = 46;
+        var l = document.createElementNS(NS, "line");
+        l.setAttribute("x1", 50 + Math.sin(a) * r1); l.setAttribute("y1", 50 - Math.cos(a) * r1);
+        l.setAttribute("x2", 50 + Math.sin(a) * r2); l.setAttribute("y2", 50 - Math.cos(a) * r2);
+        l.setAttribute("class", "tick" + (major ? " major" : ""));
+        document.getElementById("ticks").appendChild(l);
+      }
+      for (var h = 1; h <= 12; h++) {
+        var b = (h / 12) * Math.PI * 2;
+        var t = document.createElementNS(NS, "text");
+        t.setAttribute("x", 50 + Math.sin(b) * 34); t.setAttribute("y", 50 - Math.cos(b) * 34);
+        t.setAttribute("class", "num");
+        t.textContent = h;
+        document.getElementById("nums").appendChild(t);
+      }
+
+      // Seconds since local (or the chosen zone's) midnight.
+      function secondsNow() {
+        var now = new Date(), zone = s.timeZone || undefined;
+        try { new Intl.DateTimeFormat("en-US", { timeZone: zone }); } catch (e) { zone = undefined; } // unknown zone
+        var p = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "numeric", second: "numeric", hourCycle: "h23", timeZone: zone })
+          .formatToParts(now)
+          .reduce(function (o, x) { o[x.type] = Number(x.value); return o; }, {});
+        return p.hour * 3600 + p.minute * 60 + p.second + now.getMilliseconds() / 1000;
+      }
+
+      // The browser animates the hands; we only set where each one starts.
+      function syncHands() {
+        var sec = secondsNow();
+        document.getElementById("hour").style.animationDelay = -(sec % 43200) + "s";
+        document.getElementById("minute").style.animationDelay = -(sec % 3600) + "s";
+        document.getElementById("second").style.animationDelay = -(sec % 60) + "s";
+      }
+
+      Kinora.onSettings(function (next) {
+        s = Object.assign(s, next);
+        document.body.className = s.face + (Kinora.visible ? "" : " paused");
+        document.body.style.setProperty("--accent", s.accent);
+        document.getElementById("nums").style.display = s.numbers ? "" : "none";
+        var second = document.getElementById("second");
+        second.style.display = s.sweep === "hidden" ? "none" : "";
+        second.classList.toggle("tick-mode", s.sweep === "tick");
+        document.getElementById("label").textContent = s.label;
+        syncHands();
+      });
+
+      // Stop animating while hidden; catch up when shown again (and hourly, against drift).
+      Kinora.onVisibility(function (visible) {
+        document.body.classList.toggle("paused", !visible);
+        if (visible) syncHands();
+      });
+      setInterval(syncHands, 3600000);
+      syncHands();
+    </script>
+  </body>
+</html>

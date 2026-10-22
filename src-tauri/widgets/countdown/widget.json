@@ -1,0 +1,18 @@
+{
+  "name": "Countdown",
+  "description": "Days, hours and minutes until a date. Sends a notification when it arrives.",
+  "author": "Kinora",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "size": { "width": 320, "height": 150, "minWidth": 180, "minHeight": 90, "resizable": true },
+  "radius": 24,
+  "permissions": ["notifications"],
+  "settings": [
+    { "key": "title", "type": "text", "label": "Counting down to", "placeholder": "New Year", "default": "New Year" },
+    { "key": "date", "type": "text", "label": "Date (YYYY-MM-DD or YYYY-MM-DD HH:MM)", "placeholder": "2027-01-01", "default": "2027-01-01" },
+    { "key": "seconds", "type": "toggle", "label": "Show seconds", "default": true },
+    { "key": "notify", "type": "toggle", "label": "Notify when it arrives", "default": true },
+    { "key": "theme", "type": "select", "label": "Theme", "options": ["dark", "light", "clear"], "default": "dark" },
+    { "key": "accent", "type": "color", "label": "Accent", "default": "#ffd60a" }
+  ]
+}

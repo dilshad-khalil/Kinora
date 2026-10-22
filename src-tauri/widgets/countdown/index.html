@@ -1,0 +1,90 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; }
+      body {
+        --fg: #fff;
+        --dim: rgba(235, 235, 245, 0.55);
+        --tint: rgba(28, 28, 30, 0.78);
+        --accent: #ffd60a;
+        font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+        color: var(--fg);
+      }
+      body.light { --fg: #1c1c1e; --dim: rgba(60, 60, 67, 0.55); --tint: rgba(246, 246, 248, 0.86); }
+      body.clear { --tint: transparent; text-shadow: 0 1px 10px rgba(0, 0, 0, 0.55); }
+      .tile { box-sizing: border-box; height: 100%; display: flex; flex-direction: column; justify-content: center; gap: 6%; padding: 0 7%; background: var(--tint); }
+      .title { font-size: min(11vh, 5.4vw); font-weight: 700; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .units { display: flex; gap: 4%; }
+      .unit { display: flex; flex-direction: column; align-items: flex-start; }
+      .num { font-size: min(30vh, 12vw); font-weight: 650; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+      .lbl { font-size: min(7.5vh, 3.6vw); font-weight: 700; color: var(--dim); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 0.3em; }
+      .done { font-size: min(20vh, 9vw); font-weight: 700; }
+      .hidden { display: none !important; }
+    </style>
+  </head>
+  <body class="dark">
+    <div class="tile">
+      <div class="title" id="title"></div>
+      <div class="units" id="units"></div>
+      <div class="done hidden" id="done">It's here! 🎉</div>
+    </div>
+
+    <script src="/kinora.js"></script>
+    <script>
+      var s = { title: "New Year", date: "2027-01-01", seconds: true, notify: true, theme: "dark", accent: "#ffd60a" };
+      var timer = 0, wasFuture = false;
+
+      // "2027-01-01" or "2027-01-01 18:30", in local time.
+      function target() {
+        var m = String(s.date || "").trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?$/);
+        return m ? new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0)) : null;
+      }
+
+      function unit(n, label) {
+        return '<div class="unit"><div class="num">' + n + '</div><div class="lbl">' + label + "</div></div>";
+      }
+
+      function tick() {
+        clearTimeout(timer);
+        var t = target();
+        document.getElementById("title").textContent = s.title || "Countdown";
+        if (!t) {
+          document.getElementById("units").innerHTML = '<div class="lbl">Set a date like 2027-01-01</div>';
+          return;
+        }
+        var left = t - Date.now();
+        var done = left <= 0;
+        document.getElementById("done").classList.toggle("hidden", !done);
+        document.getElementById("units").classList.toggle("hidden", done);
+
+        // Notify once, at the moment it crosses zero while we're running.
+        if (done && wasFuture && s.notify) Kinora.notify(s.title || "Countdown", "It's here! 🎉");
+        wasFuture = !done;
+        if (done) return;
+
+        var sec = Math.floor(left / 1000);
+        var d = Math.floor(sec / 86400), h = Math.floor((sec % 86400) / 3600), m = Math.floor((sec % 3600) / 60), ss = sec % 60;
+        var pad = function (n) { return String(n).padStart(2, "0"); };
+        document.getElementById("units").innerHTML =
+          unit(d, d === 1 ? "day" : "days") + unit(pad(h), "hrs") + unit(pad(m), "min") + (s.seconds ? unit(pad(ss), "sec") : "");
+
+        // Next tick on the second (or minute) boundary; keep running while hidden so the
+        // notification still fires on time.
+        var step = s.seconds && Kinora.visible ? 1000 : Math.min(60000, left);
+        timer = setTimeout(tick, Math.max(50, (left % step) || step));
+      }
+
+      Kinora.onSettings(function (next) {
+        s = Object.assign(s, next);
+        document.body.className = s.theme;
+        document.body.style.setProperty("--accent", s.accent);
+        wasFuture = false; // a new date shouldn't fire an old notification
+        tick();
+      });
+      Kinora.onVisibility(tick);
+      tick();
+    </script>
+  </body>
+</html>

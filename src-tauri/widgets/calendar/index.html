@@ -1,0 +1,81 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; }
+      body {
+        --fg: #fff;
+        --dim: rgba(235, 235, 245, 0.45);
+        --tint: rgba(28, 28, 30, 0.78);
+        --accent: #ff453a;
+        font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+        color: var(--fg);
+      }
+      body.light { --fg: #1c1c1e; --dim: rgba(60, 60, 67, 0.45); --tint: rgba(246, 246, 248, 0.86); }
+      body.clear { --tint: transparent; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55); }
+
+      .tile { box-sizing: border-box; height: 100%; display: flex; flex-direction: column; padding: 7% 7% 6%; background: var(--tint); }
+      .month { font-size: min(9vh, 8vw); font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 4% 2%; }
+      .grid { flex: 1; display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 1fr; align-items: center; justify-items: center; }
+      .grid div { font-size: min(7.6vh, 6.4vw); font-weight: 600; font-variant-numeric: tabular-nums; width: 1.9em; height: 1.9em; display: grid; place-items: center; border-radius: 50%; }
+      .grid .head { font-size: min(5.6vh, 4.8vw); color: var(--dim); font-weight: 700; height: auto; }
+      .grid .weekend { color: var(--dim); }
+      .grid .today { background: var(--accent); color: #fff; text-shadow: none; }
+    </style>
+  </head>
+  <body class="dark">
+    <div class="tile">
+      <div class="month" id="month"></div>
+      <div class="grid" id="grid"></div>
+    </div>
+
+    <script src="/kinora.js"></script>
+    <script>
+      var s = { weekStart: "monday", weekend: true, theme: "dark", accent: "#ff453a" };
+      var timer = 0;
+
+      function render() {
+        var now = new Date();
+        var first = { sunday: 0, monday: 1, saturday: 6 }[s.weekStart] ?? 1;
+        var year = now.getFullYear(), month = now.getMonth();
+        document.getElementById("month").textContent = now.toLocaleDateString(undefined, { month: "long" });
+
+        var grid = document.getElementById("grid");
+        grid.innerHTML = "";
+        // Weekday initials in the locale's language, starting from the chosen day.
+        for (var i = 0; i < 7; i++) {
+          var day = (first + i) % 7;
+          var h = document.createElement("div");
+          h.className = "head";
+          h.textContent = new Date(2023, 0, 1 + day).toLocaleDateString(undefined, { weekday: "narrow" }); // Jan 1 2023 was a Sunday
+          grid.appendChild(h);
+        }
+        var offset = (new Date(year, month, 1).getDay() - first + 7) % 7;
+        for (var b = 0; b < offset; b++) grid.appendChild(document.createElement("div"));
+        var days = new Date(year, month + 1, 0).getDate();
+        for (var d = 1; d <= days; d++) {
+          var el = document.createElement("div");
+          var dow = new Date(year, month, d).getDay();
+          el.textContent = d;
+          if (s.weekend && (dow === 0 || dow === 6)) el.classList.add("weekend");
+          if (d === now.getDate()) el.classList.add("today");
+          grid.appendChild(el);
+        }
+
+        // Next update just after midnight.
+        clearTimeout(timer);
+        var midnight = new Date(year, month, now.getDate() + 1, 0, 0, 5);
+        timer = setTimeout(render, midnight - now);
+      }
+
+      Kinora.onSettings(function (next) {
+        s = Object.assign(s, next);
+        document.body.className = s.theme;
+        document.body.style.setProperty("--accent", s.accent);
+        render();
+      });
+      render();
+    </script>
+  </body>
+</html>

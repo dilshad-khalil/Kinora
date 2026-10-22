@@ -27,7 +27,7 @@ export type Widget = {
   glass: boolean;
   radius: number;
   settings: SettingDef[];
-  permissions: string[]; // "system" | "media" | "notifications"
+  permissions: string[]; // "system" | "media" | "lyrics" | "audio" | "notifications"
   error: string | null;
 };
 
@@ -45,7 +45,20 @@ export type Instance = {
 
 export type WidgetsState = { widgets: Widget[]; instances: Instance[]; revision: number };
 
-export const BUILT_IN_WIDGETS = ["clock", "quote", "system", "now-playing", "break-reminder"];
+export const BUILT_IN_WIDGETS = [
+  "clock",
+  "quote",
+  "system",
+  "now-playing",
+  "break-reminder",
+  "lyrics",
+  "audio-visualizer",
+  "analog-clock",
+  "calendar",
+  "activity-graph",
+  "sticky-note",
+  "countdown",
+];
 
 export const widgetCommands = {
   get: () => invoke<WidgetsState>("get_widgets"),

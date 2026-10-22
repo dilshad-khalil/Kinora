@@ -1,0 +1,123 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; }
+      body {
+        --fg: #fff;
+        --dim: rgba(235, 235, 245, 0.55);
+        --tint: rgba(28, 28, 30, 0.78);
+        font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+        color: var(--fg);
+      }
+      body.light { --fg: #1c1c1e; --dim: rgba(60, 60, 67, 0.55); --tint: rgba(246, 246, 248, 0.86); }
+      body.clear { --tint: transparent; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55); }
+      .tile { position: relative; height: 100%; background: var(--tint); }
+      .head { position: absolute; top: 10%; left: 7%; right: 7%; display: flex; justify-content: space-between; align-items: baseline; }
+      .name { font-size: min(9vh, 4.4vw); font-weight: 700; color: var(--dim); text-transform: uppercase; letter-spacing: 0.06em; }
+      .value { font-size: min(19vh, 9vw); font-weight: 650; font-variant-numeric: tabular-nums; }
+      .sub { font-size: min(8vh, 3.8vw); color: var(--dim); font-variant-numeric: tabular-nums; }
+      canvas { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 58%; }
+    </style>
+  </head>
+  <body class="dark">
+    <div class="tile">
+      <div class="head">
+        <div><div class="name" id="name">CPU</div><div class="sub" id="sub"></div></div>
+        <div class="value" id="value">–</div>
+      </div>
+      <canvas id="c"></canvas>
+    </div>
+
+    <script src="/kinora.js"></script>
+    <script>
+      var s = { metric: "cpu", seconds: 120, color: "#0a84ff", theme: "dark" };
+      var samples = { cpu: [], memory: [], down: [], up: [] };
+      var last = null;
+      var canvas = document.getElementById("c"), ctx = canvas.getContext("2d");
+
+      function speed(b) {
+        var u = ["B/s", "KB/s", "MB/s", "GB/s"], i = 0;
+        while (b >= 1000 && i < 3) { b /= 1000; i++; }
+        return (i ? b.toFixed(b < 10 ? 1 : 0) : Math.round(b)) + " " + u[i];
+      }
+
+      function push(list, v) {
+        list.push(v);
+        var max = Math.max(30, Number(s.seconds) || 120);
+        if (list.length > max) list.splice(0, list.length - max);
+      }
+
+      function series(values, max, color, fill) {
+        var w = canvas.width, h = canvas.height, n = Math.max(30, Number(s.seconds) || 120);
+        if (values.length < 2) return;
+        var step = w / (n - 1), x0 = w - (values.length - 1) * step;
+        var y = function (v) { return h - (v / max) * h * 0.92 - 1; };
+        ctx.beginPath();
+        ctx.moveTo(x0, y(values[0]));
+        for (var i = 1; i < values.length; i++) {
+          // Smooth curve through the midpoints.
+          var xa = x0 + (i - 1) * step, xb = x0 + i * step;
+          ctx.quadraticCurveTo(xa, y(values[i - 1]), (xa + xb) / 2, (y(values[i - 1]) + y(values[i])) / 2);
+        }
+        ctx.lineTo(w, y(values[values.length - 1]));
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2 * (devicePixelRatio || 1);
+        ctx.stroke();
+        if (fill) {
+          ctx.lineTo(w, h);
+          ctx.lineTo(x0, h);
+          ctx.closePath();
+          var g = ctx.createLinearGradient(0, 0, 0, h);
+          g.addColorStop(0, color + "66");
+          g.addColorStop(1, color + "00");
+          ctx.fillStyle = g;
+          ctx.fill();
+        }
+      }
+
+      function draw() {
+        var dpr = devicePixelRatio || 1;
+        canvas.width = Math.round(canvas.clientWidth * dpr);
+        canvas.height = Math.round(canvas.clientHeight * dpr);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        var name = document.getElementById("name"), value = document.getElementById("value"), sub = document.getElementById("sub");
+
+        if (s.metric === "network") {
+          var max = Math.max(50000, Math.max.apply(null, samples.down.concat(samples.up)) * 1.15);
+          series(samples.down, max, s.color, true);
+          series(samples.up, max, "#ff9f0a", false);
+          name.textContent = "Network";
+          value.textContent = last ? speed(last.network.down) : "–";
+          sub.textContent = last ? "↑ " + speed(last.network.up) : "";
+        } else {
+          var list = samples[s.metric];
+          series(list, 100, s.color, true);
+          name.textContent = s.metric === "cpu" ? "CPU" : "Memory";
+          value.textContent = list.length ? Math.round(list[list.length - 1]) + "%" : "–";
+          sub.textContent = !last ? "" : s.metric === "cpu"
+            ? last.cpu.cores + " threads"
+            : (last.memory.used / 1e9).toFixed(1) + " / " + (last.memory.total / 1e9).toFixed(0) + " GB";
+        }
+      }
+
+      Kinora.on("system", function (d) {
+        if (!d) return;
+        last = d;
+        push(samples.cpu, d.cpu.usage);
+        push(samples.memory, d.memory.usage);
+        push(samples.down, d.network.down);
+        push(samples.up, d.network.up);
+        if (Kinora.visible) draw();
+      });
+
+      Kinora.onSettings(function (next) {
+        s = Object.assign(s, next);
+        document.body.className = s.theme;
+        draw();
+      });
+      addEventListener("resize", draw);
+    </script>
+  </body>
+</html>

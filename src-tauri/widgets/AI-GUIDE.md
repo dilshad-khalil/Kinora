@@ -8,7 +8,8 @@ arrive.
 The user will describe the widget they want after this document. If something they ask for
 is impossible under the rules below (for example live weather, which needs the internet), say
 so and offer the closest thing that works. Kinora *does* provide system stats, the media
-that's playing (with artwork), and Windows notifications (see section 5).
+that's playing (with artwork), synced lyrics, live audio levels, and Windows notifications
+(see section 5).
 
 ---
 
@@ -60,7 +61,7 @@ Every field is optional. These are the defaults:
 | `size.resizable` | Whether the user can resize it. |
 | `radius` | Kinora clips the widget to rounded corners of this many px. Use it for tile-style widgets (24 matches the built-ins). |
 | `glass` | Kinora blurs the wallpaper behind the widget. **Leave this `false`**: over a video it costs about 200 MB of GPU memory. Paint a semi-transparent background instead. |
-| `permissions` | Live data and actions the widget uses: `"system"`, `"media"`, `"notifications"` (see section 5). List only what you use; users see these before adding the widget. |
+| `permissions` | Live data and actions the widget uses: `"system"`, `"media"`, `"lyrics"`, `"audio"`, `"notifications"` (see section 5). List only what you use; users see these before adding the widget. |
 | `settings` | User-editable options (see section 3). |
 
 The JSON must be strictly valid: no comments, no trailing commas. A broken `widget.json`
@@ -111,7 +112,7 @@ It defines `window.Kinora`:
 | --- | --- |
 | `Kinora.onSettings(fn)` | Calls `fn(settings)` with the settings object, right away if they've already arrived, and again every time the user changes something (live, with no reload). |
 | `Kinora.onVisibility(fn)` | Calls `fn(visible)` right away and whenever it changes. `false` while a fullscreen app or game is open. The widget is hidden then, so stop timers and animations. |
-| `Kinora.on(topic, fn)` | Live data. `topic` is `"system"` or `"media"`. Calls `fn(data)` right away if data has already arrived, then on every update. Needs the matching permission (section 5). |
+| `Kinora.on(topic, fn)` | Live data. `topic` is `"system"`, `"media"`, `"lyrics"` or `"audio"`. Calls `fn(data)` right away if data has already arrived, then on every update. Needs the matching permission (section 5). |
 | `Kinora.notify(title, body)` | Shows a Windows notification. Needs the `"notifications"` permission. |
 | `Kinora.onError(fn)` | Calls `fn(message)` when Kinora refuses a request, for example a missing permission or a rate limit. |
 | `Kinora.settings` | The latest settings object, or `null` before the first one arrives. |
@@ -178,6 +179,52 @@ Update it with a 1-second timer while `m.playing`, and clamp it to `m.duration`.
 
 Widgets can't control playback (no clicks), so this is read-only.
 
+### `"lyrics"`: lyrics for the playing song
+
+Kinora looks the song up on lrclib.net (it sends the title and artist there, which is why
+this is its own permission) and sends the result when the track changes. The lyrics don't
+include the playback position, so **also request `"media"`** and use its
+`position`/`updatedAt` to find the current line.
+
+```js
+Kinora.on("lyrics", function (l) {
+  if (!l) return;          // nothing playing
+  l.title; l.artist;       // the song these lyrics belong to; compare with media.title
+  l.status;                // "loading" | "found" | "none"
+  l.instrumental;          // true for instrumental tracks
+  l.synced;                // [{ time: 12.34, text: "line" }, ...] sorted by time (seconds), or null
+  l.plain;                 // the whole text with "\n" line breaks, or null
+  l.source;                // "lrclib.net"
+});
+```
+
+- `synced` lines can have empty `text` (instrumental breaks). Show `♪` or a gap.
+- Prefer `synced`. Fall back to `plain` (scroll it with the song's progress), then to a "No
+  lyrics found" message.
+- To highlight the current line: the last line with `time <= position`. Schedule your next
+  update with `setTimeout` for when the next line starts. Don't poll every frame.
+
+### `"audio"`: live audio levels
+
+The loudness of everything playing through the default speakers or headphones (the same meter
+as the Windows volume mixer). It's **levels only**: no frequencies or waveform, and no audio
+is recorded.
+
+```js
+Kinora.on("audio", function (a) {
+  a.peak;   // 0-1, overall
+  a.left;   // 0-1, left channel
+  a.right;  // 0-1, right channel
+});
+```
+
+- Arrives about **30 times a second** while sound is playing. During silence, one frame of
+  zeros is sent and then nothing until sound resumes.
+- Animate with `requestAnimationFrame`, easing between values (rise fast, fall slowly). Stop
+  the loop once everything has settled at zero, and when `onVisibility(false)` is called.
+- For a spectrum-like look, give each bar its own fixed curve or wobble scaled by the level.
+  The built-in Audio Visualizer does this.
+
 ### `"notifications"`: send a Windows notification
 
 ```js
@@ -237,6 +284,13 @@ So:
 - Files larger than 10 MB aren't served.
 
 Use classic `<script>` tags. Avoid `type="module"`.
+
+**Watch out for global names.** A top-level `var` in a classic script becomes a property of
+`window`. Names the browser already uses either fail silently or break things, for example
+`history`, `name`, `status`, `location`, `top`, `parent`, `self`, `length`, `origin`, `event`,
+`screen`, `frames`, `closed`, `open`, `close`, `stop`, `print`, `focus` and `blur`.
+(`var history = {}` is silently ignored, so `history.cpu` is `undefined`.) Use specific names
+like `samples` or `songName`, or wrap the whole script in `(function () { ... })();`.
 
 ## 7. Layout and look
 
@@ -363,8 +417,10 @@ Start from this. It handles settings, visibility, themes and resizing correctly.
 - [ ] `<script src="/kinora.js"></script>` comes before the code that uses `Kinora`.
 - [ ] Every `Kinora.on(topic)` / `Kinora.notify` has its permission in `widget.json`, and no unused permissions are listed.
 - [ ] The widget renders sensibly before live data arrives, and when `media` is `null`.
+- [ ] Lyrics widgets also request `"media"`; audio animations stop when silent or hidden.
 - [ ] No network requests, CDNs or remote fonts. Every asset is in the folder or inline.
 - [ ] No `localStorage`/cookies/`eval`/workers/`type="module"`/popups.
+- [ ] No top-level variables named after browser globals (`history`, `name`, `status`, `top`, …).
 - [ ] No buttons, hover or inputs. Customisation goes through settings only.
 - [ ] Nothing sets `color-scheme`.
 - [ ] The layout scales from the minimum size to large sizes.

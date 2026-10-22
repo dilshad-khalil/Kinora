@@ -1,0 +1,17 @@
+{
+  "name": "Sticky Note",
+  "description": "A handwritten note for your desktop. Type | for a new line.",
+  "author": "Kinora",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "size": { "width": 210, "height": 210, "minWidth": 120, "minHeight": 100, "resizable": true },
+  "radius": 4,
+  "permissions": [],
+  "settings": [
+    { "key": "text", "type": "text", "label": "Note (| for a new line)", "placeholder": "Buy milk | Call mom", "default": "Ship the widgets | Call mom | Water the plants" },
+    { "key": "paper", "type": "select", "label": "Paper", "options": ["yellow", "pink", "blue", "green"], "default": "yellow" },
+    { "key": "tape", "type": "toggle", "label": "Tape", "default": true },
+    { "key": "tilt", "type": "number", "label": "Tilt (degrees)", "min": -6, "max": 6, "step": 1, "default": -2 },
+    { "key": "lines", "type": "toggle", "label": "Ruled lines", "default": false }
+  ]
+}
