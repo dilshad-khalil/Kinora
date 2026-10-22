@@ -1,0 +1,130 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; }
+      body {
+        --fg: #fff;
+        --dim: rgba(235, 235, 245, 0.6);
+        --tint: rgba(28, 28, 30, 0.78);
+        --accent: #ff9f0a;
+        font-family: -apple-system, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+        color: var(--fg);
+        -webkit-font-smoothing: antialiased;
+      }
+      body.light { --fg: #1c1c1e; --dim: rgba(60, 60, 67, 0.6); --tint: rgba(246, 246, 248, 0.86); }
+      body.clear { --tint: transparent; text-shadow: 0 1px 12px rgba(0, 0, 0, 0.45); }
+
+      .tile {
+        box-sizing: border-box;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: min(9vh, 7vw) min(10vh, 8vw);
+        background: var(--tint);
+      }
+      .label {
+        font-size: min(11vh, 7vw);
+        font-weight: 600;
+        color: var(--accent);
+        text-transform: capitalize;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .time {
+        display: flex;
+        align-items: baseline;
+        gap: 0.12em;
+        font-size: min(40vh, 22vw);
+        font-weight: 600;
+        line-height: 1;
+        letter-spacing: -0.03em;
+        font-variant-numeric: tabular-nums;
+      }
+      .ampm { font-size: 0.32em; font-weight: 600; letter-spacing: 0; color: var(--dim); }
+      .date {
+        font-size: min(11vh, 7vw);
+        font-weight: 500;
+        color: var(--dim);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .hidden { display: none; }
+    </style>
+  </head>
+  <body class="dark">
+    <div class="tile">
+      <div class="label" id="label"></div>
+      <div class="time"><span id="time">--:--</span><span class="ampm" id="ampm"></span></div>
+      <div class="date" id="date"></div>
+    </div>
+
+    <script src="/kinora.js"></script>
+    <script>
+      var s = { label: "", format: "24h", seconds: false, date: true, timeZone: "", theme: "dark", accent: "#ff9f0a" };
+      var timer = 0;
+
+      function zone() {
+        if (!s.timeZone) return undefined;
+        try {
+          new Intl.DateTimeFormat(undefined, { timeZone: s.timeZone });
+          return s.timeZone;
+        } catch (e) {
+          return undefined; // unknown zone: fall back to local time
+        }
+      }
+
+      function tick() {
+        var now = new Date();
+        var tz = zone();
+        var parts = new Intl.DateTimeFormat("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          second: s.seconds ? "2-digit" : undefined,
+          hour12: s.format === "12h" ? true : undefined, // hour12:false can show "24:05"
+          hourCycle: s.format === "12h" ? undefined : "h23",
+          timeZone: tz,
+        }).formatToParts(now);
+        var time = parts.filter(function (p) { return p.type !== "dayPeriod" && p.type !== "literal" || p.value === ":"; })
+          .map(function (p) { return p.value; }).join("");
+        var period = parts.find(function (p) { return p.type === "dayPeriod"; });
+        document.getElementById("time").textContent = time;
+        document.getElementById("ampm").textContent = period ? period.value : "";
+
+        var weekday = new Intl.DateTimeFormat(undefined, { weekday: "long", timeZone: tz }).format(now);
+        document.getElementById("label").textContent = s.label || weekday;
+        document.getElementById("date").textContent = new Intl.DateTimeFormat(undefined, {
+          month: "long", day: "numeric", year: "numeric", timeZone: tz,
+        }).format(now);
+      }
+
+      function start() {
+        clearTimeout(timer);
+        tick();
+        // Wake up right after the next second (or minute) boundary.
+        var step = s.seconds ? 1000 : 60000;
+        timer = setTimeout(start, step - (Date.now() % step) + 20);
+      }
+
+      Kinora.onSettings(function (next) {
+        s = Object.assign(s, next);
+        document.body.className = s.theme;
+        document.body.style.setProperty("--accent", s.accent);
+        document.getElementById("date").classList.toggle("hidden", !s.date);
+        start();
+      });
+
+      // Sleep while a fullscreen app is open.
+      Kinora.onVisibility(function (visible) {
+        if (visible) start();
+        else clearTimeout(timer);
+      });
+
+      start();
+    </script>
+  </body>
+</html>

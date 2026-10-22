@@ -1,43 +1,37 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
-import type { Fit, KinoraState, MonitorInfo } from "@/lib/commands";
-
-/** A monitor's area inside this window, in CSS pixels. */
-type Region = { left: number; top: number; width: number; height: number };
+import type { Fit, KinoraState } from "@/lib/commands";
+import { useMonitorRegions, type Region } from "@/lib/regions";
+import { WidgetLayer } from "./widget-layer";
 
 /**
  * One window spans every monitor. The video is decoded once, on the first monitor;
  * the other monitors get a canvas that copies each decoded frame. A second decoder
  * costs ~90 MB of GPU-process memory, a canvas ~8 MB at 1080p.
+ * With no video (widgets only), each monitor shows the static wallpaper image instead.
  */
 export function Player() {
   const video = useRef<HTMLVideoElement>(null);
   const mirrors = useRef<HTMLDivElement>(null);
   const paused = useRef(false);
   const muted = useRef(true);
-  const [regions, setRegions] = useState<Region[]>([]);
+  const regions = useMonitorRegions();
   const [src, setSrc] = useState<string>();
+  const [still, setStill] = useState<string>(); // static wallpaper, when there's no video
   const [fit, setFit] = useState<Fit>("cover");
 
   useEffect(() => {
-    // Lay out one region per monitor, relative to this window's top-left (the bounding box).
-    invoke<MonitorInfo[]>("list_monitors").then((monitors) => {
-      const dpr = window.devicePixelRatio;
-      const x0 = Math.min(...monitors.map((m) => m.x));
-      const y0 = Math.min(...monitors.map((m) => m.y));
-      setRegions(
-        monitors.map((m) => ({
-          left: (m.x - x0) / dpr,
-          top: (m.y - y0) / dpr,
-          width: m.width / dpr,
-          height: m.height / dpr,
-        })),
-      );
-    });
-
     const load = (s: KinoraState) => {
-      if (!s.current) return;
+      if (!s.current) {
+        // Unloading needs an explicit load(); dropping the src attribute keeps it playing.
+        setSrc(undefined);
+        video.current?.removeAttribute("src");
+        video.current?.load();
+        invoke<string | null>("static_wallpaper").then((p) => setStill(p ? convertFileSrc(p) : undefined));
+        return;
+      }
+      setStill(undefined);
       setSrc(convertFileSrc(s.current));
       setFit(s.fit);
       setMuted(s.muted);
@@ -92,9 +86,12 @@ export function Player() {
   }, [regions]);
 
   const [first, ...rest] = regions;
-  const style = (r: Region): CSSProperties => ({
+  const style = ({ left, top, width, height }: Region): CSSProperties => ({
     position: "fixed",
-    ...r,
+    left,
+    top,
+    width,
+    height,
     objectFit: fit,
     background: "#000",
   });
@@ -124,6 +121,15 @@ export function Player() {
           <canvas key={i} style={style(r)} />
         ))}
       </div>
+      {!src &&
+        regions.map((r, i) =>
+          still ? (
+            <img key={i} src={still} alt="" style={{ ...style(r), objectFit: "cover" }} />
+          ) : (
+            <div key={i} style={style(r)} />
+          ),
+        )}
+      <WidgetLayer regions={regions} />
     </>
   );
 }

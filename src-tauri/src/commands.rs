@@ -1,11 +1,14 @@
 use std::path::Path;
 
 use tauri::AppHandle;
+use tauri_plugin_opener::OpenerExt;
 
 use crate::{
+    desktop,
     monitors::{self, MonitorInfo},
     state::{self, Fit, KinoraState},
     wallpaper,
+    widgets::{self, Instance, WidgetsState},
 };
 
 // Async so window creation doesn't run on (and deadlock) the main thread.
@@ -48,4 +51,68 @@ pub fn list_monitors(app: AppHandle) -> Vec<MonitorInfo> {
 #[tauri::command]
 pub fn missing_files(paths: Vec<String>) -> Vec<String> {
     paths.into_iter().filter(|p| !Path::new(p).is_file()).collect()
+}
+
+#[tauri::command]
+pub fn static_wallpaper() -> Option<String> {
+    desktop::static_wallpaper_path()
+}
+
+#[tauri::command]
+pub fn get_widgets(app: AppHandle) -> WidgetsState {
+    widgets::snapshot(&app)
+}
+
+/// Rescan the widgets folder and refresh every window (after the user edits a widget).
+#[tauri::command]
+pub fn reload_widgets(app: AppHandle) -> WidgetsState {
+    widgets::notify(&app)
+}
+
+#[tauri::command]
+pub async fn add_widget(app: AppHandle, widget: String) -> Result<WidgetsState, String> {
+    let s = widgets::add(&app, &widget)?;
+    wallpaper::sync_presence(&app)?;
+    Ok(s)
+}
+
+#[tauri::command]
+pub fn update_widget(app: AppHandle, instance: Instance) -> WidgetsState {
+    widgets::update(&app, instance)
+}
+
+#[tauri::command]
+pub async fn remove_widget(app: AppHandle, id: String) -> Result<WidgetsState, String> {
+    let s = widgets::remove(&app, &id);
+    wallpaper::sync_presence(&app)?;
+    Ok(s)
+}
+
+#[tauri::command]
+pub fn import_widget(app: AppHandle, path: String) -> Result<WidgetsState, String> {
+    widgets::import(&app, &path)
+}
+
+#[tauri::command]
+pub async fn uninstall_widget(app: AppHandle, widget: String) -> Result<WidgetsState, String> {
+    let s = widgets::uninstall(&app, &widget)?;
+    wallpaper::sync_presence(&app)?;
+    Ok(s)
+}
+
+#[tauri::command]
+pub fn open_widgets_folder(app: AppHandle) -> Result<(), String> {
+    let dir = widgets::dir(&app);
+    let _ = std::fs::create_dir_all(&dir);
+    app.opener().open_path(dir.to_string_lossy(), None::<&str>).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn open_widget_editor(app: AppHandle) -> Result<(), String> {
+    widgets::open_editor(&app)
+}
+
+#[tauri::command]
+pub fn close_widget_editor(app: AppHandle) {
+    widgets::close_editor(&app);
 }

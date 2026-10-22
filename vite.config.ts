@@ -17,6 +17,7 @@ export default defineConfig(() => ({
       input: {
         main: path.resolve(__dirname, "index.html"),
         wallpaper: path.resolve(__dirname, "wallpaper.html"),
+        editor: path.resolve(__dirname, "editor.html"),
       },
     },
   },

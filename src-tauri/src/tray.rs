@@ -55,6 +55,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
             }
             "quit" => {
                 wallpaper::stop(app);
+                wallpaper::quit(app);
                 app.exit(0);
             }
             _ => {}

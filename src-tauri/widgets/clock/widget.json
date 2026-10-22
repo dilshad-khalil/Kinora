@@ -1,0 +1,20 @@
+{
+  "name": "Clock",
+  "description": "A digital clock in the style of macOS widgets.",
+  "author": "Kinora",
+  "version": "1.1.0",
+  "entry": "index.html",
+  "size": { "width": 320, "height": 160, "minWidth": 160, "minHeight": 90, "resizable": true },
+  "glass": false,
+  "radius": 24,
+  "settings": [
+    { "key": "label", "type": "text", "label": "Label", "placeholder": "Weekday", "default": "" },
+    { "key": "format", "type": "select", "label": "Format", "options": ["24h", "12h"], "default": "24h" },
+    { "key": "seconds", "type": "toggle", "label": "Show seconds", "default": false },
+    { "key": "date", "type": "toggle", "label": "Show date", "default": true },
+    { "key": "timeZone", "type": "text", "label": "Time zone", "placeholder": "Local, or e.g. Europe/London", "default": "" },
+    { "key": "theme", "type": "select", "label": "Theme", "options": ["dark", "light", "clear"], "default": "dark" },
+    { "key": "accent", "type": "color", "label": "Accent", "default": "#ff9f0a" },
+    { "key": "glass", "type": "toggle", "label": "Blur background (uses a lot more GPU memory)", "default": false }
+  ]
+}

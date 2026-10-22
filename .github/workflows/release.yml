@@ -1,0 +1,92 @@
+# Every push to main builds the Windows installer and publishes it as a new GitHub release.
+# The version comes from the latest tag: patch bump by default, put [minor] or [major] in the
+# commit message to bump those instead. Old releases are never replaced.
+
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - ".vscode/**"
+  workflow_dispatch:
+
+# One release at a time, so two quick pushes can't claim the same version.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # tags + history, for the version and release notes
+
+      - name: Next version
+        id: version
+        env:
+          MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          latest=$(git tag -l '[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)
+          if [ -z "$latest" ]; then
+            next=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          else
+            IFS=. read -r major minor patch <<< "$latest"
+            case "$MESSAGE" in
+              *"[major]"*) next="$((major + 1)).0.0" ;;
+              *"[minor]"*) next="$major.$((minor + 1)).0" ;;
+              *)           next="$major.$minor.$((patch + 1))" ;;
+            esac
+          fi
+          echo "Releasing $next (previous: ${latest:-none})"
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+
+      - name: Stamp version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          node -e '
+            const fs = require("fs");
+            for (const f of ["package.json", "src-tauri/tauri.conf.json"]) {
+              const j = JSON.parse(fs.readFileSync(f, "utf8"));
+              j.version = process.env.VERSION;
+              fs.writeFileSync(f, JSON.stringify(j, null, 2) + "\n");
+            }
+          '
+          sed -i "0,/^version = .*/s//version = \"$VERSION\"/" src-tauri/Cargo.toml
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - run: npm ci
+
+      - name: Build installer
+        run: npm run tauri build
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "$VERSION" \
+            --target "$GITHUB_SHA" \
+            --title "Kinora $VERSION" \
+            --generate-notes \
+            src-tauri/target/release/bundle/nsis/*.exe

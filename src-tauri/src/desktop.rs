@@ -134,6 +134,23 @@ pub fn attach(ours: HWND, host: &Host, rect: RECT) -> Result<(), String> {
     Ok(())
 }
 
+/// The current static wallpaper image, if there is one (not a solid color).
+pub fn static_wallpaper_path() -> Option<String> {
+    let mut buf = [0u16; 1024];
+    unsafe {
+        SystemParametersInfoW(
+            SPI_GETDESKWALLPAPER,
+            buf.len() as u32,
+            Some(buf.as_mut_ptr().cast()),
+            SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
+        )
+        .ok()?;
+    }
+    let len = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+    let path = String::from_utf16_lossy(&buf[..len]);
+    (!path.is_empty() && std::path::Path::new(&path).is_file()).then_some(path)
+}
+
 /// Re-apply the current static wallpaper so no frozen video frame is left behind.
 pub fn refresh_static_wallpaper() {
     let mut buf = [0u16; 1024];

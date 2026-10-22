@@ -5,6 +5,7 @@ mod state;
 mod tray;
 mod wallpaper;
 mod watcher;
+mod widgets;
 
 use std::path::Path;
 
@@ -23,6 +24,9 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(AppState::default())
+        .register_uri_scheme_protocol(widgets::SCHEME, |ctx, request| {
+            widgets::serve(ctx.app_handle(), &request)
+        })
         .setup(|app| {
             let handle = app.handle().clone();
 
@@ -37,6 +41,7 @@ pub fn run() {
                 s.muted = state::settings(&handle).start_muted;
             }
 
+            widgets::install_built_ins(&handle);
             tray::build(&handle)?;
 
             // The control panel is created on demand and destroyed when closed, so it costs
@@ -65,15 +70,17 @@ pub fn run() {
                 );
             });
 
-            // Restore the last wallpaper.
-            if let Some(path) = current.filter(|p| Path::new(p).is_file()) {
-                let h = handle.clone();
-                tauri::async_runtime::spawn(async move {
-                    if let Err(e) = wallpaper::set_wallpaper(&h, path) {
-                        eprintln!("kinora: restore failed: {e}");
-                    }
-                });
-            }
+            // Restore the last wallpaper, or just the widgets.
+            let h = handle.clone();
+            tauri::async_runtime::spawn(async move {
+                let restored = match current.filter(|p| Path::new(p).is_file()) {
+                    Some(path) => wallpaper::set_wallpaper(&h, path).map(|_| ()),
+                    None => wallpaper::sync_presence(&h),
+                };
+                if let Err(e) = restored {
+                    eprintln!("kinora: restore failed: {e}");
+                }
+            });
 
             watcher::spawn(handle);
             Ok(())
@@ -87,6 +94,17 @@ pub fn run() {
             commands::get_state,
             commands::list_monitors,
             commands::missing_files,
+            commands::static_wallpaper,
+            commands::get_widgets,
+            commands::reload_widgets,
+            commands::add_widget,
+            commands::update_widget,
+            commands::remove_widget,
+            commands::import_widget,
+            commands::uninstall_widget,
+            commands::open_widgets_folder,
+            commands::open_widget_editor,
+            commands::close_widget_editor,
         ])
         .build(tauri::generate_context!())
         .expect("error while building Kinora")

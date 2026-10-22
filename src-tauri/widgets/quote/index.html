@@ -1,0 +1,144 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      @font-face {
+        font-family: "Gilda Display";
+        src: url("gilda-display.woff2") format("woff2");
+        font-display: block;
+      }
+      html, body { margin: 0; height: 100%; overflow: hidden; }
+      body {
+        --fg: #f5f2ea;
+        --dim: rgba(245, 242, 234, 0.6);
+        --tint: rgba(24, 22, 20, 0.74);
+        color: var(--fg);
+        -webkit-font-smoothing: antialiased;
+      }
+      body.light { --fg: #1f1d1a; --dim: rgba(31, 29, 26, 0.6); --tint: rgba(250, 247, 240, 0.86); }
+      body.clear { --tint: transparent; text-shadow: 0 1px 14px rgba(0, 0, 0, 0.5); }
+
+      .tile {
+        box-sizing: border-box;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.9em;
+        padding: 7% 8%;
+        background: var(--tint);
+        transition: opacity 0.6s ease;
+      }
+      .tile.fading { opacity: 0; }
+      body.center .tile { align-items: center; text-align: center; }
+      .quote {
+        font-family: "Gilda Display", Georgia, serif;
+        line-height: 1.22;
+        letter-spacing: 0.005em;
+        text-wrap: balance;
+        margin: 0;
+      }
+      .quote::before { content: "\201C"; }
+      .quote::after { content: "\201D"; }
+      .author {
+        font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--dim);
+      }
+      .author:empty { display: none; }
+      .author::before { content: "\2014\00a0"; }
+    </style>
+  </head>
+  <body class="dark">
+    <div class="tile" id="tile">
+      <p class="quote" id="quote"></p>
+      <div class="author" id="author"></div>
+    </div>
+
+    <script src="/kinora.js"></script>
+    <script>
+      var QUOTES = [
+        ["The impediment to action advances action. What stands in the way becomes the way.", "Marcus Aurelius"],
+        ["We suffer more often in imagination than in reality.", "Seneca"],
+        ["It is not that we have a short time to live, but that we waste a lot of it.", "Seneca"],
+        ["Well begun is half done.", "Aristotle"],
+        ["Nothing is so painful to the human mind as a great and sudden change.", "Mary Shelley"],
+        ["I am not afraid of storms, for I am learning how to sail my ship.", "Louisa May Alcott"],
+        ["The best way out is always through.", "Robert Frost"],
+        ["Simplicity is the ultimate sophistication.", "Leonardo da Vinci"],
+        ["What you do makes a difference, and you have to decide what kind of difference you want to make.", "Jane Goodall"],
+        ["It always seems impossible until it's done.", "Nelson Mandela"],
+        ["Do what you can, with what you have, where you are.", "Theodore Roosevelt"],
+        ["Not all those who wander are lost.", "J. R. R. Tolkien"],
+        ["The most courageous act is still to think for yourself. Aloud.", "Coco Chanel"],
+        ["Dwell on the beauty of life. Watch the stars, and see yourself running with them.", "Marcus Aurelius"],
+        ["Knowing yourself is the beginning of all wisdom.", "Aristotle"],
+        ["There is no friend as loyal as a book.", "Ernest Hemingway"],
+        ["Life is like riding a bicycle. To keep your balance you must keep moving.", "Albert Einstein"],
+        ["The secret of getting ahead is getting started.", "Mark Twain"],
+        ["Whatever you are, be a good one.", "Abraham Lincoln"],
+        ["In the middle of difficulty lies opportunity.", "Albert Einstein"],
+      ];
+
+      var s = { quote: "", author: "", rotate: 30, align: "left", theme: "dark", scale: 100 };
+      var index = Math.floor(Math.random() * QUOTES.length);
+      var timer = 0;
+      var quoteEl = document.getElementById("quote");
+      var authorEl = document.getElementById("author");
+      var tile = document.getElementById("tile");
+
+      // Largest font size (up to a cap) at which the quote still fits the tile.
+      function fit() {
+        var lo = 10, hi = Math.max(14, Math.min(innerHeight * 0.32, innerWidth * 0.12)) * (s.scale / 100);
+        quoteEl.style.fontSize = hi + "px";
+        if (tile.scrollHeight <= tile.clientHeight) return;
+        while (hi - lo > 0.5) {
+          var mid = (lo + hi) / 2;
+          quoteEl.style.fontSize = mid + "px";
+          if (tile.scrollHeight <= tile.clientHeight) lo = mid; else hi = mid;
+        }
+        quoteEl.style.fontSize = lo + "px";
+      }
+
+      function render() {
+        var custom = (s.quote || "").trim();
+        var q = custom ? [custom, s.author] : QUOTES[index % QUOTES.length];
+        quoteEl.textContent = q[0];
+        authorEl.textContent = q[1] || "";
+        fit();
+      }
+
+      function schedule() {
+        clearTimeout(timer);
+        if ((s.quote || "").trim() || !Kinora.visible) return;
+        var minutes = Math.max(1, Number(s.rotate) || 30);
+        timer = setTimeout(function () {
+          tile.classList.add("fading");
+          setTimeout(function () {
+            index++;
+            render();
+            tile.classList.remove("fading");
+            schedule();
+          }, 600);
+        }, minutes * 60000);
+      }
+
+      Kinora.onSettings(function (next) {
+        s = Object.assign(s, next);
+        document.body.className = s.theme + (s.align === "center" ? " center" : "");
+        render();
+        schedule();
+      });
+      Kinora.onVisibility(schedule);
+
+      addEventListener("resize", fit);
+      document.fonts.ready.then(fit);
+      render();
+      schedule();
+    </script>
+  </body>
+</html>

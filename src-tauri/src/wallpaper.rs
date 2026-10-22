@@ -19,6 +19,7 @@ use tauri::{
 use crate::{
     desktop, monitors,
     state::{self, AppState, Fit, KinoraState},
+    widgets,
 };
 
 const PREFIX: &str = "wallpaper-";
@@ -93,12 +94,15 @@ fn build_inner(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+fn has_windows(app: &AppHandle) -> bool {
+    app.webview_windows().keys().any(|l| l.starts_with(PREFIX))
+}
+
 pub fn set_wallpaper(app: &AppHandle, path: String) -> Result<KinoraState, String> {
     if !Path::new(&path).is_file() {
         return Err(format!("File not found: {path}"));
     }
-    let has_windows = app.webview_windows().keys().any(|l| l.starts_with(PREFIX));
-    if !has_windows {
+    if !has_windows(app) {
         build(app)?;
     }
     let s = state::update(app, |s| {
@@ -118,21 +122,49 @@ pub fn rebuild(app: &AppHandle) -> Result<(), String> {
 }
 
 pub fn stop(app: &AppHandle) -> KinoraState {
-    destroy_windows(app);
-    desktop::refresh_static_wallpaper();
-    app.state::<AppState>().runtime.lock().unwrap().host = None;
     let s = state::update(app, |s| {
         s.current = None;
         s.paused = false;
     });
     state::save(app, &s);
+    if widgets::has_instances(app) {
+        // Keep the window for the widgets; the player shows the static wallpaper instead.
+        emit(app, "player:load", s.clone());
+    } else {
+        close(app);
+    }
     s
+}
+
+/// Tear the window down and give the desktop back to Explorer.
+fn close(app: &AppHandle) {
+    destroy_windows(app);
+    desktop::refresh_static_wallpaper();
+    app.state::<AppState>().runtime.lock().unwrap().host = None;
+}
+
+/// The window exists while there's a video or a widget to show. Call after widgets change.
+pub fn sync_presence(app: &AppHandle) -> Result<(), String> {
+    let needed = state::snapshot(app).current.is_some() || widgets::has_instances(app);
+    if needed && !has_windows(app) {
+        rebuild(app)?;
+    } else if !needed && has_windows(app) {
+        close(app);
+    }
+    Ok(())
+}
+
+/// Full shutdown (tray → Quit).
+pub fn quit(app: &AppHandle) {
+    close(app);
 }
 
 /// Push the effective play/pause state to the players.
 pub fn sync_playback(app: &AppHandle, s: &KinoraState) {
     let event = if s.paused || s.auto_paused { "player:pause" } else { "player:play" };
     emit(app, event, ());
+    // Widgets ignore the user's pause, but sleep while a fullscreen app is open.
+    emit(app, "widgets:visible", !s.auto_paused);
 }
 
 pub fn set_paused(app: &AppHandle, paused: bool) -> KinoraState {

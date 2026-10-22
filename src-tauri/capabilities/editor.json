@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "editor",
+  "description": "Widget arrange overlay: events only",
+  "windows": ["widget-editor"],
+  "permissions": ["core:event:default"]
+}

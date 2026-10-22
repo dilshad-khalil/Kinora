@@ -27,3 +27,9 @@ dist-ssr
 *.mp4
 *.webm
 *.m4v
+
+# Local planning docs
+plans/
+
+
+issues.md

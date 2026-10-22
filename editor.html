@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Arrange widgets</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
+      body {
+        font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+        font-size: 13px;
+        color: #fafafa;
+        user-select: none;
+        cursor: default;
+      }
+      .screen { position: fixed; background: rgba(9, 9, 11, 0.45); }
+      .box { position: absolute; touch-action: none; cursor: grab; }
+      .box.dragging { cursor: grabbing; }
+      .box .outline {
+        position: absolute;
+        inset: -2px;
+        border: 1.5px dashed rgba(250, 250, 250, 0.7);
+        border-radius: inherit;
+        pointer-events: none;
+      }
+      .box:hover .outline, .box.dragging .outline { border-style: solid; border-color: #fafafa; }
+      .box iframe { pointer-events: none; }
+      .tag {
+        position: absolute;
+        left: 0;
+        top: -30px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 4px 3px 10px;
+        border-radius: 8px;
+        background: rgba(24, 24, 27, 0.92);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        white-space: nowrap;
+        font-weight: 500;
+      }
+      .tag .size { color: #a1a1aa; font-variant-numeric: tabular-nums; }
+      .tag button {
+        all: unset;
+        width: 20px;
+        height: 20px;
+        border-radius: 5px;
+        display: grid;
+        place-items: center;
+        color: #a1a1aa;
+        cursor: pointer;
+      }
+      .tag button:hover { background: rgba(255, 255, 255, 0.1); color: #fafafa; }
+      .handle {
+        position: absolute;
+        right: -7px;
+        bottom: -7px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #fafafa;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+        cursor: nwse-resize;
+      }
+      .toolbar {
+        position: fixed;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 8px 8px 8px 16px;
+        border-radius: 12px;
+        background: rgba(24, 24, 27, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+        transform: translateX(-50%);
+      }
+      .toolbar span { color: #a1a1aa; }
+      .toolbar button {
+        all: unset;
+        padding: 6px 14px;
+        border-radius: 8px;
+        background: #fafafa;
+        color: #18181b;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .toolbar button:hover { background: #e4e4e7; }
+      .empty { position: fixed; transform: translate(-50%, -50%); color: #d4d4d8; font-size: 15px; }
+    </style>
+  </head>
+  <body oncontextmenu="return false">
+    <div id="root"></div>
+    <script type="module" src="/src/editor/main.tsx"></script>
+  </body>
+</html>

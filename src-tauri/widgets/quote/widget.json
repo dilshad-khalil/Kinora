@@ -1,0 +1,19 @@
+{
+  "name": "Quote",
+  "description": "A rotating quote set in Gilda Display. Or write your own.",
+  "author": "Kinora",
+  "version": "1.1.0",
+  "entry": "index.html",
+  "size": { "width": 460, "height": 220, "minWidth": 200, "minHeight": 100, "resizable": true },
+  "glass": false,
+  "radius": 24,
+  "settings": [
+    { "key": "quote", "type": "text", "label": "Your own quote", "placeholder": "Leave empty to rotate built-in quotes", "default": "" },
+    { "key": "author", "type": "text", "label": "Author", "placeholder": "Who said it", "default": "" },
+    { "key": "rotate", "type": "number", "label": "Change every (minutes)", "min": 1, "max": 240, "step": 1, "default": 30 },
+    { "key": "align", "type": "select", "label": "Alignment", "options": ["left", "center"], "default": "left" },
+    { "key": "theme", "type": "select", "label": "Theme", "options": ["dark", "light", "clear"], "default": "dark" },
+    { "key": "scale", "type": "number", "label": "Text size (%)", "min": 60, "max": 150, "step": 5, "default": 100 },
+    { "key": "glass", "type": "toggle", "label": "Blur background (uses a lot more GPU memory)", "default": false }
+  ]
+}
