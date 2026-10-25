@@ -78,7 +78,6 @@ pub fn run() {
             // Restore the last wallpaper, or just the widgets.
             let h = handle.clone();
             tauri::async_runtime::spawn(async move {
-                let current = std::env::var("KINORA_TEST_VIDEO").ok().or(current); // SPIKE
                 let restored = match current.filter(|p| Path::new(p).is_file()) {
                     Some(path) => wallpaper::set_wallpaper(&h, path).map(|_| ()),
                     None => wallpaper::sync_presence(&h),
