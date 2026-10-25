@@ -99,6 +99,7 @@ pub fn run() {
             commands::set_fit,
             commands::get_state,
             commands::list_monitors,
+            commands::platform_info,
             commands::missing_files,
             commands::static_wallpaper,
             commands::get_widgets,

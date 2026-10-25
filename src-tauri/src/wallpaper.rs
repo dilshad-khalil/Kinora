@@ -17,6 +17,7 @@ use tauri::{
 
 use crate::{
     monitors,
+    platform::PlayerState,
     state::{self, AppState, Fit, KinoraState},
     widgets,
 };
@@ -30,11 +31,35 @@ pub fn is_building() -> bool {
     BUILDING.load(Ordering::Relaxed)
 }
 
-/// Send an event to the wallpaper windows only, never the control panel.
+/// Tell whatever shows the wallpaper that something changed. A platform that plays the video
+/// itself gets the whole state again; otherwise the event goes to the wallpaper windows only,
+/// never the control panel.
 fn emit<S: Serialize + Clone>(app: &AppHandle, event: &str, payload: S) {
+    if state::platform(app).remote_player().is_some() {
+        push_remote(app);
+        return;
+    }
     let _ = app.emit_filter(event, payload, |t| {
         matches!(t, EventTarget::WebviewWindow { label } if label.starts_with(PREFIX))
     });
+}
+
+/// Send the current state to a platform that plays the video itself. No-op elsewhere.
+pub fn push_remote(app: &AppHandle) {
+    let platform = state::platform(app);
+    let Some(remote) = platform.remote_player() else { return };
+    let s = state::snapshot(app);
+    let player = PlayerState {
+        video: s.current.clone(),
+        fit: s.fit,
+        muted: s.muted,
+        paused: s.paused || s.auto_paused,
+        pause_on_fullscreen: state::settings(app).pause_on_fullscreen,
+    };
+    app.state::<AppState>().runtime.lock().unwrap().attached = player.video.is_some();
+    if let Err(e) = remote.apply(&player) {
+        eprintln!("kinora: couldn't update the desktop wallpaper: {e}");
+    }
 }
 
 fn destroy_windows(app: &AppHandle) {
@@ -47,6 +72,9 @@ fn destroy_windows(app: &AppHandle) {
 
 /// (Re)create the player window and attach it to the desktop.
 fn build(app: &AppHandle) -> Result<(), String> {
+    if state::platform(app).remote_player().is_some() {
+        return Ok(()); // the desktop plays the video; there is no window to build
+    }
     let _guard = BUILD.lock().unwrap();
     BUILDING.store(true, Ordering::Relaxed);
     let result = build_inner(app);

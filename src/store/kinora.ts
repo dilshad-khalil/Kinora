@@ -11,8 +11,8 @@ export type VideoItem = {
   id: string; // nanoid
   path: string; // absolute path on disk
   name: string; // file name without extension
-  durationSec: number;
-  thumb: string; // webp data URL, ~320x180
+  durationSec: number; // 0 when unknown
+  thumb: string; // webp data URL, ~320x180; empty when the webview couldn't decode the file
   addedAt: number;
 };
 
@@ -38,6 +38,7 @@ type KinoraStore = {
   state: KinoraState;
   settings: Settings;
   launchAtLogin: boolean;
+  nativePlayback: boolean; // the desktop plays videos itself (Plasma), so previews can be missing
 
   init: () => Promise<void>;
   addFiles: (paths: string[]) => Promise<void>;
@@ -81,17 +82,19 @@ export const useKinora = create<KinoraStore>((set, get) => {
     state: { current: null, paused: false, autoPaused: false, muted: true, fit: "cover" },
     settings: DEFAULT_SETTINGS,
     launchAtLogin: false,
+    nativePlayback: false,
 
     init: async () => {
       store = await load("kinora.json", { autoSave: false, defaults: {} });
       const library = (await store.get<VideoItem[]>("library")) ?? [];
       const settings = { ...DEFAULT_SETTINGS, ...(await store.get<Settings>("settings")) };
-      const [state, missing, launchAtLogin] = await Promise.all([
+      const [state, missing, launchAtLogin, platform] = await Promise.all([
         commands.getState(),
         commands.missingFiles(library.map((v) => v.path)),
         autostart.isEnabled().catch(() => false),
+        commands.platformInfo(),
       ]);
-      set({ ready: true, library, settings, state, missing, launchAtLogin });
+      set({ ready: true, library, settings, state, missing, launchAtLogin, nativePlayback: platform.nativePlayback });
 
       // Tray actions and the watcher change state behind our back.
       listen<KinoraState>("kinora:state", (e) => set({ state: e.payload }));
@@ -111,7 +114,12 @@ export const useKinora = create<KinoraStore>((set, get) => {
           const { thumb, durationSec } = await captureThumbnail(path);
           added.push({ id: nanoid(), path, name: fileName(path), thumb, durationSec, addedAt: Date.now() });
         } catch (e) {
-          toast.error(`${fileName(path)}: ${errorMessage(e)}`);
+          // The webview can't decode it, but the desktop plays videos itself here.
+          if (get().nativePlayback) {
+            added.push({ id: nanoid(), path, name: fileName(path), thumb: "", durationSec: 0, addedAt: Date.now() });
+          } else {
+            toast.error(`${fileName(path)}: ${errorMessage(e)}`);
+          }
         }
       }
       if (added.length) await saveLibrary([...added, ...get().library]);

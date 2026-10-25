@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { FolderOpen, MoreHorizontal, Trash2 } from "lucide-react";
+import { Film, FolderOpen, MoreHorizontal, Trash2 } from "lucide-react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { useKinora, type VideoItem } from "@/store/kinora";
 
 function formatDuration(sec: number) {
-  if (!Number.isFinite(sec)) return "";
+  if (!Number.isFinite(sec) || sec <= 0) return "";
   const s = Math.round(sec);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
@@ -32,7 +32,13 @@ export function VideoCard({ video }: { video: VideoItem }) {
           isMissing && "opacity-50",
         )}
       >
-        <img src={video.thumb} alt="" className="size-full object-cover" draggable={false} />
+        {video.thumb ? (
+          <img src={video.thumb} alt="" className="size-full object-cover" draggable={false} />
+        ) : (
+          <div className="flex size-full items-center justify-center text-zinc-600">
+            <Film className="size-8" />
+          </div>
+        )}
 
         {!isMissing && !active && (
           <button
@@ -47,9 +53,11 @@ export function VideoCard({ video }: { video: VideoItem }) {
           {isMissing ? (
             <Badge variant="destructive">File not found</Badge>
           ) : (
-            <Badge variant="secondary" className="bg-black/60 tabular-nums">
-              {formatDuration(video.durationSec)}
-            </Badge>
+            video.durationSec > 0 && (
+              <Badge variant="secondary" className="bg-black/60 tabular-nums">
+                {formatDuration(video.durationSec)}
+              </Badge>
+            )
           )}
         </div>
       </div>

@@ -48,4 +48,6 @@ fn tick(app: &AppHandle) {
         let s = state::update(app, |s| s.auto_paused = auto);
         wallpaper::sync_playback(app, &s);
     }
+    // Settings change behind our back; platforms that play the video themselves need to hear.
+    wallpaper::push_remote(app);
 }

@@ -6,8 +6,14 @@ use std::sync::Arc;
 
 use tauri::WebviewWindow;
 
+use crate::state::Fit;
+
+#[cfg(target_os = "linux")]
+mod kde;
 #[cfg(target_os = "linux")]
 mod layer_shell;
+#[cfg(not(windows))]
+mod linux_common;
 #[cfg(not(windows))]
 mod stub;
 #[cfg(windows)]
@@ -57,6 +63,25 @@ pub struct MediaInfo {
     pub artwork: Option<String>,
 }
 
+/// Everything a platform that plays the video itself needs to know.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PlayerState {
+    /// None means Kinora has nothing to show, so the desktop's own wallpaper comes back.
+    pub video: Option<String>,
+    pub fit: Fit,
+    pub muted: bool,
+    /// Paused by the user or by the watcher.
+    pub paused: bool,
+    pub pause_on_fullscreen: bool,
+}
+
+/// A desktop that plays the video itself (a Plasma wallpaper plugin) instead of Kinora pinning
+/// a window to it.
+pub trait RemotePlayer: Send + Sync {
+    /// Safe to call often; backends skip a state they already applied.
+    fn apply(&self, state: &PlayerState) -> Result<(), String>;
+}
+
 /// What's playing right now. Created and used on one thread.
 pub trait MediaSource {
     /// None when nothing is playing.
@@ -82,6 +107,11 @@ pub trait Platform: Send + Sync {
     fn host_alive(&self) -> bool;
     /// Let go of the desktop host and restore the static wallpaper.
     fn detach(&self);
+    /// Set on platforms where the desktop plays the video; then no wallpaper window is built
+    /// and `prepare`/`attach` are never called.
+    fn remote_player(&self) -> Option<&dyn RemotePlayer> {
+        None
+    }
 
     /// The current static wallpaper image, if there is one (not a solid color).
     fn static_wallpaper(&self) -> Option<String>;
@@ -105,11 +135,30 @@ pub fn detect() -> Arc<dyn Platform> {
     #[cfg(windows)]
     let platform: Arc<dyn Platform> = Arc::new(win::WindowsPlatform::default());
     #[cfg(not(windows))]
-    let platform: Arc<dyn Platform> = match std::env::var("KINORA_BACKEND").as_deref() {
-        #[cfg(target_os = "linux")]
-        Ok("layer-shell") => Arc::new(layer_shell::LayerShellPlatform),
-        _ => Arc::new(stub::StubPlatform),
-    };
+    let platform: Arc<dyn Platform> = detect_linux();
     eprintln!("kinora: platform: {}", platform.name());
     platform
+}
+
+#[cfg(not(windows))]
+fn detect_linux() -> Arc<dyn Platform> {
+    #[cfg(target_os = "linux")]
+    {
+        // An explicit choice wins, for testing.
+        match std::env::var("KINORA_BACKEND").as_deref() {
+            Ok("kde") => return Arc::new(kde::KdePlatform::default()),
+            Ok("layer-shell") => return Arc::new(layer_shell::LayerShellPlatform),
+            Ok("stub") => return Arc::new(stub::StubPlatform),
+            _ => {}
+        }
+        let desktop = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default().to_lowercase();
+        let desktops: Vec<&str> = desktop.split(':').collect();
+        if desktops.contains(&"kde") {
+            return Arc::new(kde::KdePlatform::default());
+        }
+        if desktops.contains(&"hyprland") || std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some() {
+            return Arc::new(layer_shell::LayerShellPlatform);
+        }
+    }
+    Arc::new(stub::StubPlatform)
 }

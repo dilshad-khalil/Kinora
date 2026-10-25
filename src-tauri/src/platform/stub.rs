@@ -39,11 +39,11 @@ impl Platform for StubPlatform {
     }
 
     fn on_battery(&self) -> bool {
-        false
+        super::linux_common::on_battery()
     }
 
     fn battery(&self) -> Option<Battery> {
-        None
+        super::linux_common::battery()
     }
 
     fn media_source(&self) -> Option<Box<dyn MediaSource>> {

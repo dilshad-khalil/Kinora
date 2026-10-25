@@ -1,0 +1,17 @@
+{
+    "KPackageStructure": "Plasma/Wallpaper",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "Kinora"
+            }
+        ],
+        "Category": "Plasma Wallpaper Plugins",
+        "Description": "Plays the video chosen in the Kinora app.",
+        "Icon": "video-x-generic",
+        "Id": "com.kinora.wallpaper",
+        "Name": "Kinora",
+        "Version": "0.1.0"
+    },
+    "X-KDE-ParentApp": "org.kde.plasmashell"
+}
