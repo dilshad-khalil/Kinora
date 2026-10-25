@@ -6,6 +6,8 @@ use std::sync::Arc;
 
 use tauri::WebviewWindow;
 
+#[cfg(target_os = "linux")]
+mod layer_shell;
 #[cfg(not(windows))]
 mod stub;
 #[cfg(windows)]
@@ -103,7 +105,11 @@ pub fn detect() -> Arc<dyn Platform> {
     #[cfg(windows)]
     let platform: Arc<dyn Platform> = Arc::new(win::WindowsPlatform::default());
     #[cfg(not(windows))]
-    let platform: Arc<dyn Platform> = Arc::new(stub::StubPlatform);
+    let platform: Arc<dyn Platform> = match std::env::var("KINORA_BACKEND").as_deref() {
+        #[cfg(target_os = "linux")]
+        Ok("layer-shell") => Arc::new(layer_shell::LayerShellPlatform),
+        _ => Arc::new(stub::StubPlatform),
+    };
     eprintln!("kinora: platform: {}", platform.name());
     platform
 }
