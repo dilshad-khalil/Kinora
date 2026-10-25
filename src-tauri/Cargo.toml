@@ -24,9 +24,9 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri-plugin-dialog = "2"
 tauri-plugin-store = "2"
-windows = { version = "0.62", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi", "Win32_UI_Shell", "Win32_System_Power", "Media_Control", "Foundation", "Storage_Streams", "Web_Http", "Web_Http_Headers", "Win32_Media_Audio", "Win32_Media_Audio_Endpoints", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_Variant"] }
 sysinfo = { version = "0.39.6", default-features = false, features = ["system", "disk", "network"] }
 base64 = "0.23.1"
+ureq = "3.5.0"
 tauri-plugin-notification = "2.7.0"
 
 
@@ -37,6 +37,9 @@ lto = true
 opt-level = 3
 panic = "abort"
 strip = true
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi", "Win32_UI_Shell", "Win32_System_Power", "Media_Control", "Foundation", "Storage_Streams", "Win32_Media_Audio", "Win32_Media_Audio_Endpoints", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_Variant"] }
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-autostart = "2"

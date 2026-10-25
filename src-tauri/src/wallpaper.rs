@@ -11,13 +11,12 @@ use std::{
 };
 
 use serde::Serialize;
-use windows::Win32::Foundation::RECT;
 use tauri::{
     webview::Color, AppHandle, Emitter, EventTarget, Manager, WebviewUrl, WebviewWindowBuilder,
 };
 
 use crate::{
-    desktop, monitors,
+    monitors,
     state::{self, AppState, Fit, KinoraState},
     widgets,
 };
@@ -57,19 +56,11 @@ fn build(app: &AppHandle) -> Result<(), String> {
 
 fn build_inner(app: &AppHandle) -> Result<(), String> {
     destroy_windows(app);
-    let host = desktop::find_host()?;
+    let platform = state::platform(app);
+    platform.prepare()?;
     let monitors = monitors::list(app);
     // Bounding box of all monitors, in physical virtual-screen coordinates.
-    let bounds = monitors
-        .iter()
-        .map(|m| m.rect())
-        .reduce(|a, b| RECT {
-            left: a.left.min(b.left),
-            top: a.top.min(b.top),
-            right: a.right.max(b.right),
-            bottom: a.bottom.max(b.bottom),
-        })
-        .ok_or("No monitors found.")?;
+    let bounds = monitors.iter().map(|m| m.rect()).reduce(|a, b| a.union(b)).ok_or("No monitors found.")?;
 
     // Fresh label each build, so a window that is still being destroyed never collides.
     let label = format!("{PREFIX}{}", GENERATION.fetch_add(1, Ordering::Relaxed));
@@ -84,12 +75,14 @@ fn build_inner(app: &AppHandle) -> Result<(), String> {
         .background_color(Color(0, 0, 0, 255))
         .build()
         .map_err(|e| e.to_string())?;
-    let hwnd = win.hwnd().map_err(|e| e.to_string())?;
-    desktop::attach(hwnd, &host, bounds)?;
+    if let Err(e) = platform.attach(&win, bounds) {
+        let _ = win.destroy();
+        return Err(e);
+    }
 
     let app_state = app.state::<AppState>();
     let mut runtime = app_state.runtime.lock().unwrap();
-    runtime.host = Some(host);
+    runtime.attached = true;
     runtime.monitors = monitors;
     Ok(())
 }
@@ -139,8 +132,8 @@ pub fn stop(app: &AppHandle) -> KinoraState {
 /// Tear the window down and give the desktop back to Explorer.
 fn close(app: &AppHandle) {
     destroy_windows(app);
-    desktop::refresh_static_wallpaper();
-    app.state::<AppState>().runtime.lock().unwrap().host = None;
+    state::platform(app).detach();
+    app.state::<AppState>().runtime.lock().unwrap().attached = false;
 }
 
 /// The window exists while there's a video or a widget to show. Call after widgets change.

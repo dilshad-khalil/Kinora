@@ -1,6 +1,7 @@
 use serde::Serialize;
 use tauri::{AppHandle, Monitor};
-use windows::Win32::Foundation::RECT;
+
+use crate::platform::Rect;
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -16,13 +17,8 @@ pub struct MonitorInfo {
 }
 
 impl MonitorInfo {
-    pub fn rect(&self) -> RECT {
-        RECT {
-            left: self.x,
-            top: self.y,
-            right: self.x + self.width as i32,
-            bottom: self.y + self.height as i32,
-        }
+    pub fn rect(&self) -> Rect {
+        Rect { x: self.x, y: self.y, w: self.width as i32, h: self.height as i32 }
     }
 }
 

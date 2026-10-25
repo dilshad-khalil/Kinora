@@ -1,11 +1,11 @@
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_store::StoreExt;
 
-use crate::{desktop::Host, monitors::MonitorInfo};
+use crate::{monitors::MonitorInfo, platform::Platform};
 
 pub const STORE: &str = "kinora.json";
 
@@ -46,14 +46,25 @@ impl Default for Settings {
 /// Native bits that only Rust cares about.
 #[derive(Default)]
 pub struct Runtime {
-    pub host: Option<Host>,
+    /// The wallpaper window is up and pinned to the desktop.
+    pub attached: bool,
     pub monitors: Vec<MonitorInfo>,
 }
 
-#[derive(Default)]
 pub struct AppState {
     pub state: Mutex<KinoraState>,
     pub runtime: Mutex<Runtime>,
+    pub platform: Arc<dyn Platform>,
+}
+
+impl AppState {
+    pub fn new(platform: Arc<dyn Platform>) -> Self {
+        Self { state: Default::default(), runtime: Default::default(), platform }
+    }
+}
+
+pub fn platform(app: &AppHandle) -> Arc<dyn Platform> {
+    app.state::<AppState>().platform.clone()
 }
 
 pub fn snapshot(app: &AppHandle) -> KinoraState {

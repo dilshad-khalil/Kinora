@@ -1,8 +1,8 @@
 mod audio;
 mod commands;
-mod desktop;
 mod lyrics;
 mod monitors;
+mod platform;
 mod providers;
 mod state;
 mod tray;
@@ -27,7 +27,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
-        .manage(AppState::default())
+        .manage(AppState::new(platform::detect()))
         .register_uri_scheme_protocol(widgets::SCHEME, |ctx, request| {
             widgets::serve(ctx.app_handle(), &request)
         })
@@ -35,7 +35,7 @@ pub fn run() {
             let handle = app.handle().clone();
 
             // Clear any frame left behind by a crash last time.
-            desktop::refresh_static_wallpaper();
+            state::platform(&handle).refresh_static_wallpaper();
 
             let (current, fit) = state::load_saved(&handle);
             {

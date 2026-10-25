@@ -4,7 +4,6 @@ use tauri::AppHandle;
 use tauri_plugin_opener::OpenerExt;
 
 use crate::{
-    desktop,
     monitors::{self, MonitorInfo},
     providers,
     state::{self, Fit, KinoraState},
@@ -55,8 +54,8 @@ pub fn missing_files(paths: Vec<String>) -> Vec<String> {
 }
 
 #[tauri::command]
-pub fn static_wallpaper() -> Option<String> {
-    desktop::static_wallpaper_path()
+pub fn static_wallpaper(app: AppHandle) -> Option<String> {
+    state::platform(&app).static_wallpaper()
 }
 
 #[tauri::command]

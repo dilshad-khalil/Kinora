@@ -10,20 +10,14 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-use base64::Engine;
 use serde_json::{json, Value};
 use sysinfo::{Disks, Networks, System};
 use tauri::{AppHandle, Emitter, Manager};
-use windows::{
-    Media::Control::{
-        GlobalSystemMediaTransportControlsSessionManager as SessionManager,
-        GlobalSystemMediaTransportControlsSessionPlaybackStatus as Status,
-    },
-    Storage::Streams::DataReader,
-    Win32::System::Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS},
-};
 
-use crate::state::{self, AppState};
+use crate::{
+    platform::{MediaInfo, MediaSource, Platform},
+    state::{self, AppState},
+};
 
 pub const SYSTEM: &str = "system";
 pub const MEDIA: &str = "media";
@@ -52,7 +46,7 @@ pub fn publish(app: &AppHandle, topic: &str, data: Value) {
 
 /// Whether the widgets are on screen.
 fn shown(app: &AppHandle) -> bool {
-    app.state::<AppState>().runtime.lock().unwrap().host.is_some() && !state::snapshot(app).auto_paused
+    app.state::<AppState>().runtime.lock().unwrap().attached && !state::snapshot(app).auto_paused
 }
 
 /// A placed widget may read `topic` and the widgets are on screen.
@@ -62,9 +56,10 @@ pub fn wanted(app: &AppHandle, topic: &str) -> bool {
 
 pub fn spawn(app: AppHandle) {
     crate::audio::spawn(app.clone());
+    let platform = state::platform(&app);
     thread::spawn(move || {
         let mut system = SystemSampler::new();
-        let mut media = MediaSampler::default();
+        let mut media = MediaSampler::new(platform.media_source());
         loop {
             thread::sleep(Duration::from_secs(1));
             // Only while the widgets are on screen.
@@ -73,7 +68,7 @@ pub fn spawn(app: AppHandle) {
                 continue;
             }
             if needed.contains(SYSTEM) {
-                publish(&app, SYSTEM, system.sample());
+                publish(&app, SYSTEM, system.sample(platform.as_ref()));
             }
             // Lyrics follow the media topic, so sample media for either.
             if needed.contains(MEDIA) || needed.contains(LYRICS) {
@@ -112,7 +107,7 @@ impl SystemSampler {
         }
     }
 
-    fn sample(&mut self) -> Value {
+    fn sample(&mut self, platform: &dyn Platform) -> Value {
         self.sys.refresh_cpu_usage();
         self.sys.refresh_memory();
         self.networks.refresh(true);
@@ -157,22 +152,17 @@ impl SystemSampler {
             "memory": { "used": used, "total": total, "usage": percent(used, total) },
             "disks": disks,
             "network": { "down": (down as f64 / secs).round(), "up": (up as f64 / secs).round() },
-            "battery": battery(),
+            "battery": battery(platform),
             "uptime": System::uptime(),
         })
     }
 }
 
-fn battery() -> Value {
-    let mut s = SYSTEM_POWER_STATUS::default();
-    if unsafe { GetSystemPowerStatus(&mut s) }.is_err() || s.BatteryFlag & 128 != 0 || s.BatteryFlag == 255 {
+fn battery(platform: &dyn Platform) -> Value {
+    let Some(b) = platform.battery() else {
         return Value::Null; // no battery (desktop) or unknown
-    }
-    json!({
-        "percent": (s.BatteryLifePercent != 255).then_some(s.BatteryLifePercent),
-        "charging": s.BatteryFlag & 8 != 0,
-        "pluggedIn": s.ACLineStatus == 1,
-    })
+    };
+    json!({ "percent": b.percent, "charging": b.charging, "pluggedIn": b.plugged_in })
 }
 
 fn percent(part: u64, total: u64) -> f64 {
@@ -183,24 +173,24 @@ fn round1(v: f64) -> f64 {
     (v * 10.0).round() / 10.0
 }
 
-// ---- Media (Windows' "now playing", the same source as the volume flyout) ----
+// ---- Media (what the system says is playing) ----
 
-#[derive(Default)]
 struct MediaSampler {
-    manager: Option<SessionManager>,
+    source: Option<Box<dyn MediaSource>>,
     /// Identity of what was last sent, minus the position.
     sent: String,
     /// Position we last sent, when, and whether it was moving.
     sent_position: Option<(f64, Instant, bool)>,
-    art_track: String,
-    art: Option<String>,
-    art_tries: u32,
 }
 
 impl MediaSampler {
+    fn new(source: Option<Box<dyn MediaSource>>) -> Self {
+        Self { source, sent: String::new(), sent_position: None }
+    }
+
     /// Some(data) when something changed; data is `null` when nothing is playing.
     fn sample(&mut self) -> Option<Value> {
-        let now = self.read().unwrap_or(Value::Null);
+        let now = self.source.as_mut().and_then(|s| s.current()).map(to_json).unwrap_or(Value::Null);
         let key = json!([now["title"], now["artist"], now["album"], now["status"], now["duration"], now["app"], now["artwork"].is_string()])
             .to_string();
         let position = now["position"].as_f64();
@@ -221,87 +211,21 @@ impl MediaSampler {
         self.sent_position = position.map(|p| (p, Instant::now(), playing));
         Some(now)
     }
-
-    fn read(&mut self) -> windows::core::Result<Value> {
-        if self.manager.is_none() {
-            self.manager = Some(SessionManager::RequestAsync()?.join()?);
-        }
-        let manager = self.manager.as_ref().unwrap();
-        let Ok(session) = manager.GetCurrentSession() else {
-            return Ok(Value::Null);
-        };
-        let props = session.TryGetMediaPropertiesAsync()?.join()?;
-        let title = props.Title()?.to_string();
-        let artist = props.Artist()?.to_string();
-        let album = props.AlbumTitle()?.to_string();
-        let status = session.GetPlaybackInfo()?.PlaybackStatus()?;
-        let playing = status == Status::Playing;
-
-        let timeline = session.GetTimelineProperties()?;
-        let duration = ticks_to_secs(timeline.EndTime()?.Duration - timeline.StartTime()?.Duration);
-        let mut position = ticks_to_secs(timeline.Position()?.Duration);
-        if playing {
-            // The timeline is a snapshot from LastUpdatedTime; move it forward to now.
-            let updated_ms = (timeline.LastUpdatedTime()?.UniversalTime - 116_444_736_000_000_000) / 10_000;
-            let since = (unix_ms() - updated_ms).max(0) as f64 / 1000.0;
-            position += since;
-        }
-        if duration > 0.0 {
-            position = position.min(duration);
-        }
-
-        // Artwork only when the track changes (apps sometimes add it a moment later).
-        let track = format!("{title}\u{1}{artist}\u{1}{album}");
-        if track != self.art_track {
-            self.art_track = track;
-            self.art = None;
-            self.art_tries = 0;
-        }
-        if self.art.is_none() && self.art_tries < 5 {
-            self.art_tries += 1;
-            self.art = props.Thumbnail().ok().and_then(|t| read_image(&t).ok());
-        }
-
-        Ok(json!({
-            "title": title,
-            "artist": artist,
-            "album": album,
-            "app": session.SourceAppUserModelId()?.to_string(),
-            "status": status_name(status),
-            "playing": playing,
-            "position": round1(position),
-            "duration": round1(duration),
-            "updatedAt": unix_ms(),
-            "artwork": self.art,
-        }))
-    }
 }
 
-/// Read a thumbnail stream into a data URL (at most 2 MB).
-fn read_image(r: &windows::Storage::Streams::IRandomAccessStreamReference) -> windows::core::Result<String> {
-    let stream = r.OpenReadAsync()?.join()?;
-    let size = stream.Size()?.min(2 * 1024 * 1024) as u32;
-    let mime = stream.ContentType().map(|m| m.to_string()).unwrap_or_default();
-    let reader = DataReader::CreateDataReader(&stream)?;
-    reader.LoadAsync(size)?.join()?;
-    let mut bytes = vec![0u8; size as usize];
-    reader.ReadBytes(&mut bytes)?;
-    let mime = if mime.starts_with("image/") { mime } else { "image/jpeg".into() };
-    Ok(format!("data:{mime};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes)))
-}
-
-fn status_name(s: Status) -> &'static str {
-    match s {
-        Status::Playing => "playing",
-        Status::Paused => "paused",
-        Status::Stopped => "stopped",
-        Status::Changing => "changing",
-        _ => "closed",
-    }
-}
-
-fn ticks_to_secs(ticks: i64) -> f64 {
-    ticks.max(0) as f64 / 10_000_000.0
+fn to_json(m: MediaInfo) -> Value {
+    json!({
+        "title": m.title,
+        "artist": m.artist,
+        "album": m.album,
+        "app": m.app,
+        "status": m.status,
+        "playing": m.playing,
+        "position": round1(m.position),
+        "duration": round1(m.duration),
+        "updatedAt": unix_ms(),
+        "artwork": m.artwork,
+    })
 }
 
 fn unix_ms() -> i64 {
