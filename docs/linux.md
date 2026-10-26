@@ -1,16 +1,24 @@
 # Kinora on Linux
 
-Kinora picks how to show the wallpaper from the desktop it runs on (`XDG_CURRENT_DESKTOP`). Set `KINORA_BACKEND` to `kde`, `layer-shell` or `stub` to force one.
+Kinora picks a backend from your desktop (`XDG_CURRENT_DESKTOP`). Force one with `KINORA_BACKEND=kde|layer-shell|stub`.
 
-| Desktop | Backend | How it works |
-|---|---|---|
-| KDE Plasma | `kde` | A Plasma wallpaper plugin (`kde-plugin/com.kinora.wallpaper`) plays the video. Kinora installs it into `~/.local/share/plasma/wallpapers/` and tells plasmashell what to play. |
-| Hyprland (Omarchy), sway | `layer-shell` | The wallpaper window becomes a wlr-layer-shell surface on the background layer, click-through. |
-| anything else | `stub` | A plain window, so the app still runs. Not a wallpaper. |
+| Desktop                  | Backend       | Status                                              |
+| ------------------------ | ------------- | --------------------------------------------------- |
+| KDE Plasma               | `kde`         | Video wallpaper works. No widgets yet.              |
+| Hyprland (Omarchy), sway | `layer-shell` | Experimental: window shows, video doesn't play yet. |
+| Anything else            | `stub`        | A plain window, not a wallpaper.                    |
 
-## Running from source
+## Install
 
-You need Node, Rust, `webkit2gtk-4.1`, and for the layer-shell backend `gtk-layer-shell`.
+| Distro                  | Command                                                                                                            |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Zorin / Ubuntu / Debian | `npm run tauri build -- --bundles deb`, then `sudo apt install ./src-tauri/target/release/bundle/deb/Kinora_*.deb` |
+| Arch / Omarchy          | `cd packaging/arch && makepkg -si`                                                                                 |
+| Any                     | `npm run tauri build -- --no-bundle`, then run `src-tauri/target/release/kinora`                                   |
+
+Building needs Node and Rust. Tagged releases on GitHub include the `.deb` and the Arch package.
+
+## Run from source
 
 ```sh
 sudo pacman -S webkit2gtk-4.1 gtk-layer-shell   # Arch / Omarchy
@@ -18,30 +26,39 @@ npm install
 npm run tauri dev
 ```
 
-The first build takes a few minutes. Add an MP4 in the control panel, then click it to set the wallpaper.
+Add an MP4 in the control panel, then click it to set the wallpaper. The log should say which backend was picked (`platform: kde`).
 
 ## KDE Plasma
 
-- Works on every monitor, with desktop icons and widgets above it, and pauses while a window is fullscreen on that screen.
-- Kinora remembers each desktop's previous wallpaper plugin (in `~/.local/state/kinora/kde-previous.json`) and puts it back on Stop and Quit.
-- Videos play through Qt Multimedia, so codecs depend on your FFmpeg build (HEVC and AV1 are fine on most setups). Library thumbnails may be missing, because the app's own webview can't decode them on Linux yet.
-- Not done yet on KDE: widgets.
+Kinora installs a Plasma wallpaper plugin (`kde-plugin/`) and tells Plasma what to play.
 
-If a crash ever leaves the Kinora plugin on a desktop, put the stock wallpaper back with:
+- Plays on every monitor, under your icons and panels.
+- Pauses while a window is fullscreen on that screen.
+- Your previous wallpapers come back on Stop and Quit. They're remembered in `~/.local/state/kinora/kde-previous.json`.
+- Codecs depend on your FFmpeg build; HEVC and AV1 work on most setups.
+- Library thumbnails may be blank, because the app's webview can't decode video on Linux yet.
+
+If a crash leaves the Kinora wallpaper stuck, restore the default with:
 
 ```sh
 busctl --user call org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell evaluateScript s \
   'desktops().forEach(function (d) { d.wallpaperPlugin = "org.kde.image"; })'
 ```
 
-## Hyprland / layer-shell (for testing)
+## Hyprland (testing)
 
-Known limitations right now:
+The wallpaper window becomes a click-through layer-shell surface on the background layer.
 
-- **Video does not play yet.** The app's webview can't play video from Tauri's `asset://` protocol on Linux (WebKitGTK), so the window comes up black. A local media server is planned. Widgets that don't need video should show.
-- **One monitor only.** A layer-shell surface covers a single output. The primary monitor is used, or set `KINORA_MONITOR` to a monitor name (for example `DP-1`).
-- No media, audio or fullscreen auto-pause data yet. Pause on battery works.
+Known limitations:
 
-Debug overrides: `KINORA_LAYER=background|bottom|top` (default `background`) and `KINORA_MONITOR=<name>`.
+- **No video yet.** WebKitGTK can't play video from Tauri's `asset://` protocol, so the window is black. A local media server is planned.
+- **One monitor.** The primary one, or set `KINORA_MONITOR=DP-1` (a monitor name).
+- No media, audio or fullscreen auto-pause data. Pause on battery works.
 
-Useful to report back: does a black window appear behind your other windows and on the right monitor, are clicks passing through to the desktop, and does the log (the terminal running `npm run tauri dev`) show `platform: layer-shell`.
+Debug override: `KINORA_LAYER=background|bottom|top` (default `background`).
+
+When testing, check that:
+
+- the log shows `platform: layer-shell`
+- a black window sits behind your apps, on the right monitor
+- clicks pass through to the desktop

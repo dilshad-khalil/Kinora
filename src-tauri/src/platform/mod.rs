@@ -151,12 +151,16 @@ fn detect_linux() -> Arc<dyn Platform> {
             Ok("stub") => return Arc::new(stub::StubPlatform),
             _ => {}
         }
-        let desktop = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default().to_lowercase();
+        let desktop = std::env::var("XDG_CURRENT_DESKTOP")
+            .unwrap_or_default()
+            .to_lowercase();
         let desktops: Vec<&str> = desktop.split(':').collect();
         if desktops.contains(&"kde") {
             return Arc::new(kde::KdePlatform::default());
         }
-        if desktops.contains(&"hyprland") || std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some() {
+        if desktops.contains(&"hyprland")
+            || std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some()
+        {
             return Arc::new(layer_shell::LayerShellPlatform);
         }
     }

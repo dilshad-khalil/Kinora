@@ -7,13 +7,17 @@ use super::Battery;
 const SUPPLIES: &str = "/sys/class/power_supply";
 
 fn read(dir: &Path, name: &str) -> Option<String> {
-    fs::read_to_string(dir.join(name)).ok().map(|s| s.trim().to_string())
+    fs::read_to_string(dir.join(name))
+        .ok()
+        .map(|s| s.trim().to_string())
 }
 
 /// Every power supply of type "Mains" is offline. Machines without a battery,
 /// or whose adapter isn't listed, count as plugged in.
 pub fn on_battery() -> bool {
-    let Ok(entries) = fs::read_dir(SUPPLIES) else { return false };
+    let Ok(entries) = fs::read_dir(SUPPLIES) else {
+        return false;
+    };
     let mut mains = entries
         .flatten()
         .map(|e| e.path())

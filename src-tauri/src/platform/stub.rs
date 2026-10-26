@@ -17,8 +17,10 @@ impl Platform for StubPlatform {
     }
 
     fn attach(&self, win: &WebviewWindow, bounds: Rect) -> Result<(), String> {
-        win.set_position(PhysicalPosition::new(bounds.x, bounds.y)).map_err(|e| e.to_string())?;
-        win.set_size(PhysicalSize::new(bounds.w as u32, bounds.h as u32)).map_err(|e| e.to_string())?;
+        win.set_position(PhysicalPosition::new(bounds.x, bounds.y))
+            .map_err(|e| e.to_string())?;
+        win.set_size(PhysicalSize::new(bounds.w as u32, bounds.h as u32))
+            .map_err(|e| e.to_string())?;
         win.show().map_err(|e| e.to_string())
     }
 

@@ -9,7 +9,7 @@ use gtk::prelude::*;
 use gtk_layer_shell::{Edge, Layer, LayerShell};
 use tauri::WebviewWindow;
 
-use super::{linux_common, AudioMeter, Battery, MediaSource, Platform, Rect};
+use super::{AudioMeter, Battery, MediaSource, Platform, Rect, linux_common};
 
 pub struct LayerShellPlatform;
 
@@ -63,7 +63,9 @@ fn pick_monitor(display: &gtk::gdk::Display) -> Option<gtk::gdk::Monitor> {
             .filter_map(|i| display.monitor(i))
             .find(|m| m.model().is_some_and(|model| model.as_str() == name))
     });
-    named.or_else(|| display.primary_monitor()).or_else(|| display.monitor(0))
+    named
+        .or_else(|| display.primary_monitor())
+        .or_else(|| display.monitor(0))
 }
 
 impl Platform for LayerShellPlatform {

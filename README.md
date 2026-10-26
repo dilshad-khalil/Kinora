@@ -46,20 +46,20 @@ Widgets sit on your desktop behind the icons, on top of your wallpaper. Open the
 
 Kinora comes with these widgets:
 
-| Widget | What it shows |
-| --- | --- |
-| **Clock** | A digital clock in the style of macOS widgets |
-| **Analog Clock** | A classic clock face with a sweeping second hand |
-| **Calendar** | This month at a glance, with today highlighted |
-| **Countdown** | Days, hours and minutes until a date, with a notification when it arrives |
-| **Break Reminder** | Counts down to your next break and sends a Windows notification |
-| **Sticky Note** | A handwritten note for your desktop |
-| **Quote** | A rotating quote, or one you write yourself |
-| **System** | CPU, memory and disk, plus network speed and battery |
-| **Activity Graph** | A live chart of CPU, memory or network activity over the last few minutes |
-| **Now Playing** | The song or video playing in Spotify, your browser or any media app, with artwork |
-| **Lyrics** | Time-synced lyrics for the song that's playing, from [lrclib.net](https://lrclib.net) |
-| **Audio Visualizer** | Bars that move with whatever your PC is playing |
+| Widget               | What it shows                                                                         |
+| -------------------- | ------------------------------------------------------------------------------------- |
+| **Clock**            | A digital clock in the style of macOS widgets                                         |
+| **Analog Clock**     | A classic clock face with a sweeping second hand                                      |
+| **Calendar**         | This month at a glance, with today highlighted                                        |
+| **Countdown**        | Days, hours and minutes until a date, with a notification when it arrives             |
+| **Break Reminder**   | Counts down to your next break and sends a Windows notification                       |
+| **Sticky Note**      | A handwritten note for your desktop                                                   |
+| **Quote**            | A rotating quote, or one you write yourself                                           |
+| **System**           | CPU, memory and disk, plus network speed and battery                                  |
+| **Activity Graph**   | A live chart of CPU, memory or network activity over the last few minutes             |
+| **Now Playing**      | The song or video playing in Spotify, your browser or any media app, with artwork     |
+| **Lyrics**           | Time-synced lyrics for the song that's playing, from [lrclib.net](https://lrclib.net) |
+| **Audio Visualizer** | Bars that move with whatever your PC is playing                                       |
 
 You can also import a widget from a folder or a single `.html` file, and remove any widget you don't want.
 
@@ -83,8 +83,12 @@ Drop the folder into the widgets folder (the Widgets tab has a button that opens
 ```html
 <script src="/kinora.js"></script>
 <script>
-  Kinora.onSettings((s) => { document.body.style.color = s.color; });
-  Kinora.on("system", (d) => { /* d.cpu.usage, d.memory.usage, ... */ });
+  Kinora.onSettings((s) => {
+    document.body.style.color = s.color;
+  });
+  Kinora.on("system", (d) => {
+    /* d.cpu.usage, d.memory.usage, ... */
+  });
 </script>
 ```
 

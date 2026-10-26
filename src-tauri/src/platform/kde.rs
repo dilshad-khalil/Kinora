@@ -13,17 +13,31 @@ use std::{
 use serde_json::Value;
 use tauri::WebviewWindow;
 
-use super::{linux_common, AudioMeter, Battery, MediaSource, Platform, PlayerState, Rect, RemotePlayer};
+use super::{
+    AudioMeter, Battery, MediaSource, Platform, PlayerState, Rect, RemotePlayer, linux_common,
+};
 use crate::state::Fit;
 
 const PLUGIN: &str = "com.kinora.wallpaper";
 
 /// (path inside the plugin folder, contents)
 const PLUGIN_FILES: [(&str, &str); 4] = [
-    ("metadata.json", include_str!("../../../kde-plugin/com.kinora.wallpaper/metadata.json")),
-    ("contents/config/main.xml", include_str!("../../../kde-plugin/com.kinora.wallpaper/contents/config/main.xml")),
-    ("contents/ui/main.qml", include_str!("../../../kde-plugin/com.kinora.wallpaper/contents/ui/main.qml")),
-    ("contents/ui/config.qml", include_str!("../../../kde-plugin/com.kinora.wallpaper/contents/ui/config.qml")),
+    (
+        "metadata.json",
+        include_str!("../../../kde-plugin/com.kinora.wallpaper/metadata.json"),
+    ),
+    (
+        "contents/config/main.xml",
+        include_str!("../../../kde-plugin/com.kinora.wallpaper/contents/config/main.xml"),
+    ),
+    (
+        "contents/ui/main.qml",
+        include_str!("../../../kde-plugin/com.kinora.wallpaper/contents/ui/main.qml"),
+    ),
+    (
+        "contents/ui/config.qml",
+        include_str!("../../../kde-plugin/com.kinora.wallpaper/contents/ui/config.qml"),
+    ),
 ];
 
 #[derive(Default)]
@@ -161,12 +175,21 @@ desktops().forEach(function (d) {{
 /// Run a script inside plasmashell and return what it printed.
 fn run_script(script: &str) -> Result<String, String> {
     let out = Command::new("busctl")
-        .args(["--user", "--json=short", "call", "org.kde.plasmashell", "/PlasmaShell"])
+        .args([
+            "--user",
+            "--json=short",
+            "call",
+            "org.kde.plasmashell",
+            "/PlasmaShell",
+        ])
         .args(["org.kde.PlasmaShell", "evaluateScript", "s", script])
         .output()
         .map_err(|e| format!("couldn't run busctl: {e}"))?;
     if !out.status.success() {
-        return Err(format!("plasmashell didn't answer: {}", String::from_utf8_lossy(&out.stderr).trim()));
+        return Err(format!(
+            "plasmashell didn't answer: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ));
     }
     let reply: Value = serde_json::from_slice(&out.stdout).map_err(|e| e.to_string())?;
     Ok(reply["data"][0].as_str().unwrap_or_default().to_string())
@@ -178,25 +201,34 @@ fn js_string(s: &str) -> String {
 }
 
 fn home() -> PathBuf {
-    std::env::var_os("HOME").map(PathBuf::from).unwrap_or_default()
+    std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_default()
 }
 
 fn dir_from(env: &str, fallback: &str) -> PathBuf {
-    std::env::var_os(env).map(PathBuf::from).filter(|p| p.is_absolute()).unwrap_or_else(|| home().join(fallback))
+    std::env::var_os(env)
+        .map(PathBuf::from)
+        .filter(|p| p.is_absolute())
+        .unwrap_or_else(|| home().join(fallback))
 }
 
 /// Copy the plugin into the user's plugin folder when it's missing or out of date.
 fn install_plugin() -> Result<(), String> {
-    let root = dir_from("XDG_DATA_HOME", ".local/share").join("plasma/wallpapers").join(PLUGIN);
+    let root = dir_from("XDG_DATA_HOME", ".local/share")
+        .join("plasma/wallpapers")
+        .join(PLUGIN);
     for (path, contents) in PLUGIN_FILES {
         let target = root.join(path);
         if fs::read_to_string(&target).is_ok_and(|current| current == contents) {
             continue;
         }
         if let Some(dir) = target.parent() {
-            fs::create_dir_all(dir).map_err(|e| format!("couldn't create {}: {e}", dir.display()))?;
+            fs::create_dir_all(dir)
+                .map_err(|e| format!("couldn't create {}: {e}", dir.display()))?;
         }
-        fs::write(&target, contents).map_err(|e| format!("couldn't write {}: {e}", target.display()))?;
+        fs::write(&target, contents)
+            .map_err(|e| format!("couldn't write {}: {e}", target.display()))?;
     }
     Ok(())
 }
@@ -208,7 +240,10 @@ fn previous_path() -> PathBuf {
 }
 
 fn load_previous() -> BTreeMap<String, String> {
-    fs::read_to_string(previous_path()).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
+    fs::read_to_string(previous_path())
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
 }
 
 fn save_previous(previous: &BTreeMap<String, String>) -> Result<(), String> {
@@ -246,11 +281,18 @@ mod tests {
         };
 
         kde.apply(&state).unwrap();
-        assert!(plugins().iter().all(|p| p == PLUGIN), "every desktop should use the Kinora plugin");
+        assert!(
+            plugins().iter().all(|p| p == PLUGIN),
+            "every desktop should use the Kinora plugin"
+        );
         kde.apply(&state).unwrap(); // unchanged state is skipped
 
         std::thread::sleep(std::time::Duration::from_secs(3));
         kde.detach();
-        assert_eq!(plugins(), before, "detach should put every desktop's wallpaper back");
+        assert_eq!(
+            plugins(),
+            before,
+            "detach should put every desktop's wallpaper back"
+        );
     }
 }
