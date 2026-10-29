@@ -4,7 +4,6 @@ use tauri::AppHandle;
 use tauri_plugin_opener::OpenerExt;
 
 use crate::{
-    desktop,
     monitors::{self, MonitorInfo},
     providers,
     state::{self, Fit, KinoraState},
@@ -43,6 +42,20 @@ pub fn get_state(app: AppHandle) -> KinoraState {
     state::snapshot(&app)
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlatformInfo {
+    name: &'static str,
+    /// The desktop plays the video itself, so the webview never has to decode it.
+    native_playback: bool,
+}
+
+#[tauri::command]
+pub fn platform_info(app: AppHandle) -> PlatformInfo {
+    let platform = state::platform(&app);
+    PlatformInfo { name: platform.name(), native_playback: platform.remote_player().is_some() }
+}
+
 #[tauri::command]
 pub fn list_monitors(app: AppHandle) -> Vec<MonitorInfo> {
     monitors::list(&app)
@@ -55,8 +68,8 @@ pub fn missing_files(paths: Vec<String>) -> Vec<String> {
 }
 
 #[tauri::command]
-pub fn static_wallpaper() -> Option<String> {
-    desktop::static_wallpaper_path()
+pub fn static_wallpaper(app: AppHandle) -> Option<String> {
+    state::platform(&app).static_wallpaper()
 }
 
 #[tauri::command]

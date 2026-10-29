@@ -1,0 +1,33 @@
+# Builds Kinora from the checkout this file lives in (no download):
+#   cd packaging/arch && makepkg -si
+pkgname=kinora
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Video wallpapers and desktop widgets (KDE Plasma, Hyprland)'
+arch=(x86_64)
+url='https://github.com/dilshad-khalil/Kinora'
+license=(custom)
+depends=(webkit2gtk-4.1 gtk3 gtk-layer-shell libayatana-appindicator)
+makedepends=(rust nodejs npm)
+options=(!lto !debug)
+
+build() {
+  cd "$startdir/../.."
+  npm ci
+  npm run tauri build -- --no-bundle
+}
+
+package() {
+  cd "$startdir/../.."
+  install -Dm755 src-tauri/target/release/kinora "$pkgdir/usr/bin/kinora"
+  install -Dm644 src-tauri/icons/128x128.png "$pkgdir/usr/share/icons/hicolor/128x128/apps/kinora.png"
+  install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/kinora.desktop" <<D
+[Desktop Entry]
+Type=Application
+Name=Kinora
+Comment=Video wallpapers and desktop widgets
+Exec=kinora
+Icon=kinora
+Categories=Utility;
+D
+}

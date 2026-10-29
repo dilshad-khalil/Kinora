@@ -6,12 +6,6 @@ use std::{collections::HashMap, sync::Mutex, thread, time::Duration};
 
 use serde_json::{json, Value};
 use tauri::AppHandle;
-use windows::{
-    core::HSTRING,
-    Foundation::Uri,
-    Web::Http::{HttpClient, HttpStatusCode},
-};
-
 use crate::providers;
 
 const USER_AGENT: &str = "Kinora (https://github.com/dilshad-khalil/Kinora)";
@@ -159,28 +153,32 @@ fn clean_title(title: &str) -> String {
     t.trim().to_string()
 }
 
-/// GET a JSON document with Windows' HTTP client. One retry, since lrclib sometimes answers
-/// 503 when busy. None on 404 or any failure.
+/// GET a JSON document. One retry, since lrclib sometimes answers 503 when busy. None on 404
+/// or any failure.
 fn get_json(url: &str) -> Option<Value> {
     for attempt in 0..2 {
         if attempt > 0 {
             thread::sleep(Duration::from_secs(3));
         }
         match get(url) {
-            Ok((status, body)) if status == HttpStatusCode::Ok => return serde_json::from_str(&body).ok(),
-            Ok((status, _)) if status == HttpStatusCode::NotFound => return None,
+            Ok((200, body)) => return serde_json::from_str(&body).ok(),
+            Ok((404, _)) => return None,
             Ok(_) | Err(_) => continue,
         }
     }
     None
 }
 
-fn get(url: &str) -> windows::core::Result<(HttpStatusCode, String)> {
-    let client = HttpClient::new()?;
-    client.DefaultRequestHeaders()?.UserAgent()?.TryParseAdd(&HSTRING::from(USER_AGENT))?;
-    let response = client.GetAsync(&Uri::CreateUri(&HSTRING::from(url))?)?.join()?;
-    let status = response.StatusCode()?;
-    let body = response.Content()?.ReadAsStringAsync()?.join()?.to_string();
+fn get(url: &str) -> Result<(u16, String), ureq::Error> {
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .user_agent(USER_AGENT)
+        .http_status_as_error(false)
+        .timeout_global(Some(Duration::from_secs(15)))
+        .build()
+        .into();
+    let mut response = agent.get(url).call()?;
+    let status = response.status().as_u16();
+    let body = response.body_mut().read_to_string()?;
     Ok((status, body))
 }
 

@@ -1,0 +1,23 @@
+name: Stamp version
+description: Writes the release version into package.json, tauri.conf.json and Cargo.toml.
+inputs:
+  version:
+    description: Version to write
+    required: true
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+      run: |
+        node -e '
+          const fs = require("fs");
+          for (const f of ["package.json", "src-tauri/tauri.conf.json"]) {
+            const j = JSON.parse(fs.readFileSync(f, "utf8"));
+            j.version = process.env.VERSION;
+            fs.writeFileSync(f, JSON.stringify(j, null, 2) + "\n");
+          }
+        '
+        sed -i "0,/^version = .*/s//version = \"$VERSION\"/" src-tauri/Cargo.toml
+        sed -i "s/^pkgver=.*/pkgver=$VERSION/" packaging/arch/PKGBUILD

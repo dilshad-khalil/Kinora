@@ -11,13 +11,13 @@ use std::{
 };
 
 use serde::Serialize;
-use windows::Win32::Foundation::RECT;
 use tauri::{
     webview::Color, AppHandle, Emitter, EventTarget, Manager, WebviewUrl, WebviewWindowBuilder,
 };
 
 use crate::{
-    desktop, monitors,
+    monitors,
+    platform::PlayerState,
     state::{self, AppState, Fit, KinoraState},
     widgets,
 };
@@ -31,11 +31,35 @@ pub fn is_building() -> bool {
     BUILDING.load(Ordering::Relaxed)
 }
 
-/// Send an event to the wallpaper windows only, never the control panel.
+/// Tell whatever shows the wallpaper that something changed. A platform that plays the video
+/// itself gets the whole state again; otherwise the event goes to the wallpaper windows only,
+/// never the control panel.
 fn emit<S: Serialize + Clone>(app: &AppHandle, event: &str, payload: S) {
+    if state::platform(app).remote_player().is_some() {
+        push_remote(app);
+        return;
+    }
     let _ = app.emit_filter(event, payload, |t| {
         matches!(t, EventTarget::WebviewWindow { label } if label.starts_with(PREFIX))
     });
+}
+
+/// Send the current state to a platform that plays the video itself. No-op elsewhere.
+pub fn push_remote(app: &AppHandle) {
+    let platform = state::platform(app);
+    let Some(remote) = platform.remote_player() else { return };
+    let s = state::snapshot(app);
+    let player = PlayerState {
+        video: s.current.clone(),
+        fit: s.fit,
+        muted: s.muted,
+        paused: s.paused || s.auto_paused,
+        pause_on_fullscreen: state::settings(app).pause_on_fullscreen,
+    };
+    app.state::<AppState>().runtime.lock().unwrap().attached = player.video.is_some();
+    if let Err(e) = remote.apply(&player) {
+        eprintln!("kinora: couldn't update the desktop wallpaper: {e}");
+    }
 }
 
 fn destroy_windows(app: &AppHandle) {
@@ -48,6 +72,9 @@ fn destroy_windows(app: &AppHandle) {
 
 /// (Re)create the player window and attach it to the desktop.
 fn build(app: &AppHandle) -> Result<(), String> {
+    if state::platform(app).remote_player().is_some() {
+        return Ok(()); // the desktop plays the video; there is no window to build
+    }
     let _guard = BUILD.lock().unwrap();
     BUILDING.store(true, Ordering::Relaxed);
     let result = build_inner(app);
@@ -57,19 +84,11 @@ fn build(app: &AppHandle) -> Result<(), String> {
 
 fn build_inner(app: &AppHandle) -> Result<(), String> {
     destroy_windows(app);
-    let host = desktop::find_host()?;
+    let platform = state::platform(app);
+    platform.prepare()?;
     let monitors = monitors::list(app);
     // Bounding box of all monitors, in physical virtual-screen coordinates.
-    let bounds = monitors
-        .iter()
-        .map(|m| m.rect())
-        .reduce(|a, b| RECT {
-            left: a.left.min(b.left),
-            top: a.top.min(b.top),
-            right: a.right.max(b.right),
-            bottom: a.bottom.max(b.bottom),
-        })
-        .ok_or("No monitors found.")?;
+    let bounds = monitors.iter().map(|m| m.rect()).reduce(|a, b| a.union(b)).ok_or("No monitors found.")?;
 
     // Fresh label each build, so a window that is still being destroyed never collides.
     let label = format!("{PREFIX}{}", GENERATION.fetch_add(1, Ordering::Relaxed));
@@ -84,12 +103,14 @@ fn build_inner(app: &AppHandle) -> Result<(), String> {
         .background_color(Color(0, 0, 0, 255))
         .build()
         .map_err(|e| e.to_string())?;
-    let hwnd = win.hwnd().map_err(|e| e.to_string())?;
-    desktop::attach(hwnd, &host, bounds)?;
+    if let Err(e) = platform.attach(&win, bounds) {
+        let _ = win.destroy();
+        return Err(e);
+    }
 
     let app_state = app.state::<AppState>();
     let mut runtime = app_state.runtime.lock().unwrap();
-    runtime.host = Some(host);
+    runtime.attached = true;
     runtime.monitors = monitors;
     Ok(())
 }
@@ -139,8 +160,8 @@ pub fn stop(app: &AppHandle) -> KinoraState {
 /// Tear the window down and give the desktop back to Explorer.
 fn close(app: &AppHandle) {
     destroy_windows(app);
-    desktop::refresh_static_wallpaper();
-    app.state::<AppState>().runtime.lock().unwrap().host = None;
+    state::platform(app).detach();
+    app.state::<AppState>().runtime.lock().unwrap().attached = false;
 }
 
 /// The window exists while there's a video or a widget to show. Call after widgets change.

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+      http://www.kde.org/standards/kcfg/1.0/kcfg.xsd" >
+  <kcfgfile name=""/>
+
+  <group name="General">
+    <entry name="Video" type="String">
+      <label>Path of the video to play</label>
+      <default></default>
+    </entry>
+    <entry name="Fit" type="int">
+      <label>How the video fills the screen: 0 cover, 1 contain, 2 fill</label>
+      <default>0</default>
+    </entry>
+    <entry name="Muted" type="bool">
+      <label>Play without sound</label>
+      <default>true</default>
+    </entry>
+    <entry name="Paused" type="bool">
+      <label>Hold the video on its current frame</label>
+      <default>false</default>
+    </entry>
+    <entry name="PauseOnFullscreen" type="bool">
+      <label>Pause while a window is fullscreen on this screen</label>
+      <default>true</default>
+    </entry>
+  </group>
+</kcfg>
