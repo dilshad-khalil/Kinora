@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Settings2 } from "lucide-react";
 import { getVersion } from "@tauri-apps/api/app";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
   Sheet,
@@ -125,19 +126,22 @@ export function SettingsSheet() {
           />
           <div className="flex items-center justify-between gap-4">
             <Label htmlFor="interval">Change every</Label>
-            <select
-              id="interval"
-              value={rotation.intervalMin}
+            <Select
+              value={String(rotation.intervalMin)}
               disabled={!rotation.enabled}
-              onChange={(e) => updateRotation({ intervalMin: Number(e.target.value) })}
-              className="h-8 rounded-md border border-zinc-800 bg-background px-2 text-sm disabled:opacity-50"
+              onValueChange={(v) => updateRotation({ intervalMin: Number(v) })}
             >
-              {INTERVALS.map((i) => (
-                <option key={i.min} value={i.min}>
-                  {i.label}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="interval">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {INTERVALS.map((i) => (
+                  <SelectItem key={i.min} value={String(i.min)}>
+                    {i.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <Row
             id="shuffle"
