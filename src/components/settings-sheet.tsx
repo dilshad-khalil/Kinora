@@ -39,8 +39,20 @@ function Row(props: {
   );
 }
 
+const INTERVALS = [
+  { min: 5, label: "5 minutes" },
+  { min: 15, label: "15 minutes" },
+  { min: 30, label: "30 minutes" },
+  { min: 60, label: "1 hour" },
+  { min: 360, label: "6 hours" },
+  { min: 1440, label: "Daily" },
+];
+
 export function SettingsSheet() {
-  const { settings, updateSettings, launchAtLogin, setLaunchAtLogin } = useKinora();
+  const { settings, updateSettings, launchAtLogin, setLaunchAtLogin, rotation, updateRotation } =
+    useKinora();
+  const missing = useKinora((s) => s.missing);
+  const rotationCount = rotation.paths.filter((p) => !missing.includes(p)).length;
   const [version, setVersion] = useState("");
 
   useEffect(() => {
@@ -96,6 +108,43 @@ export function SettingsSheet() {
             hint="Applies the next time Kinora starts"
             checked={settings.startMuted}
             onChange={(v) => updateSettings({ startMuted: v })}
+          />
+        </div>
+
+        <div className="flex flex-col gap-5 border-t border-zinc-800 px-4 pt-5">
+          <Row
+            id="rotation"
+            label="Rotate wallpapers"
+            hint={
+              rotationCount < 2
+                ? "Tick at least 2 videos in the library"
+                : `${rotationCount} videos in rotation`
+            }
+            checked={rotation.enabled}
+            onChange={(v) => updateRotation({ enabled: v })}
+          />
+          <div className="flex items-center justify-between gap-4">
+            <Label htmlFor="interval">Change every</Label>
+            <select
+              id="interval"
+              value={rotation.intervalMin}
+              disabled={!rotation.enabled}
+              onChange={(e) => updateRotation({ intervalMin: Number(e.target.value) })}
+              className="h-8 rounded-md border border-zinc-800 bg-background px-2 text-sm disabled:opacity-50"
+            >
+              {INTERVALS.map((i) => (
+                <option key={i.min} value={i.min}>
+                  {i.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Row
+            id="shuffle"
+            label="Shuffle"
+            checked={rotation.shuffle}
+            disabled={!rotation.enabled}
+            onChange={(v) => updateRotation({ shuffle: v })}
           />
         </div>
 

@@ -23,6 +23,14 @@ export type Settings = {
   startMuted: boolean;
 };
 
+/** Read by the Rust rotation thread from the same kinora.json store. */
+export type Rotation = {
+  enabled: boolean;
+  paths: string[]; // library videos to cycle through
+  intervalMin: number;
+  shuffle: boolean;
+};
+
 export const VIDEO_EXTENSIONS = ["mp4", "webm", "m4v"];
 
 const DEFAULT_SETTINGS: Settings = {
@@ -31,12 +39,20 @@ const DEFAULT_SETTINGS: Settings = {
   startMuted: true,
 };
 
+const DEFAULT_ROTATION: Rotation = {
+  enabled: false,
+  paths: [],
+  intervalMin: 15,
+  shuffle: false,
+};
+
 type KinoraStore = {
   ready: boolean;
   library: VideoItem[];
   missing: string[]; // paths that no longer exist
   state: KinoraState;
   settings: Settings;
+  rotation: Rotation;
   launchAtLogin: boolean;
   nativePlayback: boolean; // the desktop plays videos itself (Plasma), so previews can be missing
 
@@ -49,6 +65,9 @@ type KinoraStore = {
   setFit: (fit: Fit) => Promise<void>;
   stop: () => Promise<void>;
   updateSettings: (patch: Partial<Settings>) => Promise<void>;
+  updateRotation: (patch: Partial<Rotation>) => Promise<void>;
+  toggleRotationMember: (path: string) => Promise<void>;
+  nextWallpaper: () => Promise<void>;
   setLaunchAtLogin: (enabled: boolean) => Promise<void>;
 };
 
@@ -81,6 +100,7 @@ export const useKinora = create<KinoraStore>((set, get) => {
     missing: [],
     state: { current: null, paused: false, autoPaused: false, muted: true, fit: "cover" },
     settings: DEFAULT_SETTINGS,
+    rotation: DEFAULT_ROTATION,
     launchAtLogin: false,
     nativePlayback: false,
 
@@ -88,13 +108,14 @@ export const useKinora = create<KinoraStore>((set, get) => {
       store = await load("kinora.json", { autoSave: false, defaults: {} });
       const library = (await store.get<VideoItem[]>("library")) ?? [];
       const settings = { ...DEFAULT_SETTINGS, ...(await store.get<Settings>("settings")) };
+      const rotation = { ...DEFAULT_ROTATION, ...(await store.get<Rotation>("rotation")) };
       const [state, missing, launchAtLogin, platform] = await Promise.all([
         commands.getState(),
         commands.missingFiles(library.map((v) => v.path)),
         autostart.isEnabled().catch(() => false),
         commands.platformInfo(),
       ]);
-      set({ ready: true, library, settings, state, missing, launchAtLogin, nativePlayback: platform.nativePlayback });
+      set({ ready: true, library, settings, rotation, state, missing, launchAtLogin, nativePlayback: platform.nativePlayback });
 
       // Tray actions and the watcher change state behind our back.
       listen<KinoraState>("kinora:state", (e) => set({ state: e.payload }));
@@ -126,7 +147,11 @@ export const useKinora = create<KinoraStore>((set, get) => {
     },
 
     remove: async (id) => {
+      const gone = get().library.find((v) => v.id === id);
       await saveLibrary(get().library.filter((v) => v.id !== id));
+      if (gone && get().rotation.paths.includes(gone.path)) {
+        await get().updateRotation({ paths: get().rotation.paths.filter((p) => p !== gone.path) });
+      }
     },
 
     setWallpaper: async (path) => {
@@ -150,6 +175,23 @@ export const useKinora = create<KinoraStore>((set, get) => {
       await store.set("settings", settings);
       await store.save();
     },
+
+    updateRotation: async (patch) => {
+      const rotation = { ...get().rotation, ...patch };
+      set({ rotation });
+      await store.set("rotation", rotation);
+      await store.save();
+      await commands.rotationChanged();
+    },
+
+    toggleRotationMember: async (path) => {
+      const { paths } = get().rotation;
+      await get().updateRotation({
+        paths: paths.includes(path) ? paths.filter((p) => p !== path) : [...paths, path],
+      });
+    },
+
+    nextWallpaper: () => run(() => commands.nextWallpaper()),
 
     setLaunchAtLogin: async (enabled) => {
       try {
