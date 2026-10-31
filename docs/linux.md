@@ -26,6 +26,8 @@ npm install
 npm run tauri dev
 ```
 
+Wallpaper rotation (Settings → Rotate wallpapers) works on every backend that plays a video.
+
 Add an MP4 in the control panel, then click it to set the wallpaper. The log should say which backend was picked (`platform: kde`).
 
 ## KDE Plasma
