@@ -5,6 +5,7 @@ use tauri::{
 };
 
 use crate::{
+    rotation,
     state::{self, KinoraState},
     wallpaper,
 };
@@ -13,6 +14,7 @@ use crate::{
 pub struct TrayItems {
     pause: MenuItem<Wry>,
     mute: MenuItem<Wry>,
+    next: MenuItem<Wry>,
     stop: MenuItem<Wry>,
 }
 
@@ -20,6 +22,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "show", "Show Kinora", true, None::<&str>)?;
     let pause = MenuItem::with_id(app, "pause", "Pause", false, None::<&str>)?;
     let mute = MenuItem::with_id(app, "mute", "Unmute", false, None::<&str>)?;
+    let next = MenuItem::with_id(app, "next", "Next wallpaper", false, None::<&str>)?;
     let stop = MenuItem::with_id(app, "stop", "Stop wallpaper", false, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let menu = Menu::with_items(
@@ -29,6 +32,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
             &PredefinedMenuItem::separator(app)?,
             &pause,
             &mute,
+            &next,
             &stop,
             &PredefinedMenuItem::separator(app)?,
             &quit,
@@ -50,6 +54,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
                 let muted = state::snapshot(app).muted;
                 wallpaper::set_muted(app, !muted);
             }
+            "next" => rotation::next(app),
             "stop" => {
                 wallpaper::stop(app);
             }
@@ -72,7 +77,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
         })
         .build(app)?;
 
-    app.manage(TrayItems { pause, mute, stop });
+    app.manage(TrayItems { pause, mute, next, stop });
     Ok(())
 }
 
@@ -83,6 +88,7 @@ pub fn refresh(app: &AppHandle, s: &KinoraState) {
     let _ = items.mute.set_text(if s.muted { "Unmute" } else { "Mute" });
     let _ = items.pause.set_enabled(active);
     let _ = items.mute.set_enabled(active);
+    let _ = items.next.set_enabled(active && rotation::usable(app).len() > 1);
     let _ = items.stop.set_enabled(active);
 }
 

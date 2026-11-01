@@ -43,6 +43,22 @@ impl Default for Settings {
     }
 }
 
+/// Written by the settings sheet and the library cards through the store plugin's JS API.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Rotation {
+    pub enabled: bool,
+    pub paths: Vec<String>,
+    pub interval_min: u64,
+    pub shuffle: bool,
+}
+
+impl Default for Rotation {
+    fn default() -> Self {
+        Self { enabled: false, paths: Vec::new(), interval_min: 15, shuffle: false }
+    }
+}
+
 /// Native bits that only Rust cares about.
 #[derive(Default)]
 pub struct Runtime {
@@ -88,6 +104,14 @@ pub fn settings(app: &AppHandle) -> Settings {
     app.store(STORE)
         .ok()
         .and_then(|s| s.get("settings"))
+        .and_then(|v| serde_json::from_value(v).ok())
+        .unwrap_or_default()
+}
+
+pub fn rotation(app: &AppHandle) -> Rotation {
+    app.store(STORE)
+        .ok()
+        .and_then(|s| s.get("rotation"))
         .and_then(|v| serde_json::from_value(v).ok())
         .unwrap_or_default()
 }

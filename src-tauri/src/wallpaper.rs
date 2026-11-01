@@ -18,6 +18,7 @@ use tauri::{
 use crate::{
     monitors,
     platform::PlayerState,
+    rotation,
     state::{self, AppState, Fit, KinoraState},
     widgets,
 };
@@ -131,6 +132,7 @@ pub fn set_wallpaper(app: &AppHandle, path: String) -> Result<KinoraState, Strin
         s.paused = false;
     });
     state::save(app, &s);
+    rotation::mark_changed();
     // A desktop that plays the video itself can say why it couldn't.
     if state::platform(app).remote_player().is_some() {
         push_remote(app)?;

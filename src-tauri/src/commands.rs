@@ -5,7 +5,7 @@ use tauri_plugin_opener::OpenerExt;
 
 use crate::{
     monitors::{self, MonitorInfo},
-    providers,
+    providers, rotation,
     state::{self, Fit, KinoraState},
     wallpaper,
     widgets::{self, Instance, WidgetsState},
@@ -35,6 +35,19 @@ pub fn set_muted(app: AppHandle, muted: bool) -> KinoraState {
 #[tauri::command]
 pub fn set_fit(app: AppHandle, fit: Fit) -> KinoraState {
     wallpaper::set_fit(&app, fit)
+}
+
+#[tauri::command]
+pub fn next_wallpaper(app: AppHandle) -> KinoraState {
+    rotation::next(&app);
+    state::snapshot(&app)
+}
+
+/// The rotation list or settings were saved: restart the countdown and refresh the tray.
+#[tauri::command]
+pub fn rotation_changed(app: AppHandle) {
+    rotation::mark_changed();
+    crate::tray::refresh(&app, &state::snapshot(&app));
 }
 
 #[tauri::command]

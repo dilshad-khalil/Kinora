@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Film, FolderOpen, MoreHorizontal, Trash2 } from "lucide-react";
+import { Check, Film, FolderOpen, MoreHorizontal, Trash2 } from "lucide-react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,9 +19,10 @@ function formatDuration(sec: number) {
 }
 
 export function VideoCard({ video }: { video: VideoItem }) {
-  const { state, missing, setWallpaper, remove } = useKinora();
+  const { state, missing, rotation, setWallpaper, remove, toggleRotationMember } = useKinora();
   const active = state.current === video.path;
   const isMissing = missing.includes(video.path);
+  const inRotation = rotation.paths.includes(video.path);
 
   return (
     <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.15 }} className="group">
@@ -46,6 +47,24 @@ export function VideoCard({ video }: { video: VideoItem }) {
             className="absolute inset-0 flex items-center justify-center bg-black/55 text-sm font-medium opacity-0 transition-opacity group-hover:opacity-100"
           >
             Set as wallpaper
+          </button>
+        )}
+
+        {!isMissing && (
+          <button
+            role="checkbox"
+            aria-checked={inRotation}
+            aria-label="Include in rotation"
+            title="Include in rotation"
+            onClick={() => toggleRotationMember(video.path)}
+            className={cn(
+              "absolute top-1.5 left-1.5 flex size-5 items-center justify-center rounded border transition-opacity",
+              inRotation
+                ? "border-zinc-200 bg-zinc-200 text-zinc-900"
+                : "border-zinc-400 bg-black/60 opacity-0 group-hover:opacity-100",
+            )}
+          >
+            {inRotation && <Check className="size-3.5" />}
           </button>
         )}
 

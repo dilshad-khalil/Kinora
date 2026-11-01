@@ -4,6 +4,7 @@ mod lyrics;
 mod monitors;
 mod platform;
 mod providers;
+mod rotation;
 mod state;
 mod tray;
 mod wallpaper;
@@ -88,6 +89,7 @@ pub fn run() {
             });
 
             providers::spawn(handle.clone());
+            rotation::spawn(handle.clone());
             watcher::spawn(handle);
             Ok(())
         })
@@ -98,6 +100,8 @@ pub fn run() {
             commands::set_muted,
             commands::set_fit,
             commands::get_state,
+            commands::next_wallpaper,
+            commands::rotation_changed,
             commands::list_monitors,
             commands::platform_info,
             commands::missing_files,

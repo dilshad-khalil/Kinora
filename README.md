@@ -31,6 +31,7 @@ It's named after the Kinora, a flip-card viewer from the 1890s.
 - A library of your recent videos, with thumbnails.
 - Play, pause, mute, change how the video fits (fill, fit, stretch) and stop. Stopping restores your normal wallpaper.
 - **Saves power:** playback pauses on its own when a fullscreen app or game covers the desktop, and optionally when you're on battery.
+- Optional **rotation**: tick two or more videos in the library, turn on *Rotate wallpapers* in Settings, and pick how often to change (5 minutes to daily, with shuffle). The tray has a *Next wallpaper* item. Off by default.
 - Lives in the **system tray**. Closing the window keeps the wallpaper running.
 - Remembers your last wallpaper and restores it at launch. You can also launch Kinora at login.
 - Works with both Windows desktop layouts: the classic one (Windows 10, Windows 11 up to 23H2) and the newer one (Windows 11 24H2 and later).
