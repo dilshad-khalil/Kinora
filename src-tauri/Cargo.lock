@@ -1985,6 +1985,7 @@ dependencies = [
  "base64 0.23.1",
  "gtk",
  "gtk-layer-shell",
+ "libc",
  "serde",
  "serde_json",
  "sysinfo",

@@ -101,6 +101,7 @@ pub fn run() {
             commands::list_monitors,
             commands::platform_info,
             commands::missing_files,
+            commands::video_thumbnail,
             commands::static_wallpaper,
             commands::get_widgets,
             commands::reload_widgets,

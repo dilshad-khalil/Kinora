@@ -49,5 +49,5 @@ fn tick(app: &AppHandle) {
         wallpaper::sync_playback(app, &s);
     }
     // Settings change behind our back; platforms that play the video themselves need to hear.
-    wallpaper::push_remote(app);
+    let _ = wallpaper::push_remote(app);
 }
