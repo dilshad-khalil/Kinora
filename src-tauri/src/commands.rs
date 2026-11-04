@@ -155,3 +155,43 @@ pub fn widget_data(topic: String) -> Option<serde_json::Value> {
 pub fn widget_notify(app: AppHandle, instance: String, title: String, body: String) -> Result<(), String> {
     widgets::notify_from(&app, &instance, &title, &body)
 }
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Thumbnail {
+    thumb: String,
+    duration_sec: f64,
+}
+
+/// A 320x180 frame and the length of a video, made with ffmpeg. For videos the webview can't
+/// decode (it has no codecs on Linux).
+#[tauri::command]
+pub async fn video_thumbnail(path: String) -> Result<Thumbnail, String> {
+    use base64::Engine;
+    use std::process::Command;
+
+    let run = |cmd: &mut Command| {
+        cmd.output().map_err(|e| format!("couldn't run {:?}: {e}", cmd.get_program()))
+    };
+    let probe = run(Command::new("ffprobe").args([
+        "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", &path,
+    ]))?;
+    let duration_sec: f64 = String::from_utf8_lossy(&probe.stdout).trim().parse().unwrap_or(0.0);
+    if duration_sec <= 0.0 {
+        return Err("not a video ffmpeg can read".into());
+    }
+    let at = (duration_sec * 0.1).min(1.0).to_string();
+    let frame = run(Command::new("ffmpeg").args([
+        "-v", "error", "-ss", &at, "-i", &path, "-frames:v", "1",
+        "-vf", "scale=320:180:force_original_aspect_ratio=increase,crop=320:180",
+        "-f", "image2pipe", "-c:v", "mjpeg", "-",
+    ]))?;
+    if frame.stdout.is_empty() {
+        return Err("ffmpeg couldn't read a frame".into());
+    }
+    let thumb = format!(
+        "data:image/jpeg;base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(frame.stdout)
+    );
+    Ok(Thumbnail { thumb, duration_sec })
+}

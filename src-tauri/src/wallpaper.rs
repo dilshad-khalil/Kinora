@@ -37,7 +37,7 @@ pub fn is_building() -> bool {
 /// never the control panel.
 fn emit<S: Serialize + Clone>(app: &AppHandle, event: &str, payload: S) {
     if state::platform(app).remote_player().is_some() {
-        push_remote(app);
+        let _ = push_remote(app);
         return;
     }
     let _ = app.emit_filter(event, payload, |t| {
@@ -46,9 +46,9 @@ fn emit<S: Serialize + Clone>(app: &AppHandle, event: &str, payload: S) {
 }
 
 /// Send the current state to a platform that plays the video itself. No-op elsewhere.
-pub fn push_remote(app: &AppHandle) {
+pub fn push_remote(app: &AppHandle) -> Result<(), String> {
     let platform = state::platform(app);
-    let Some(remote) = platform.remote_player() else { return };
+    let Some(remote) = platform.remote_player() else { return Ok(()) };
     let s = state::snapshot(app);
     let player = PlayerState {
         video: s.current.clone(),
@@ -58,9 +58,9 @@ pub fn push_remote(app: &AppHandle) {
         pause_on_fullscreen: state::settings(app).pause_on_fullscreen,
     };
     app.state::<AppState>().runtime.lock().unwrap().attached = player.video.is_some();
-    if let Err(e) = remote.apply(&player) {
+    remote.apply(&player).inspect_err(|e| {
         eprintln!("kinora: couldn't update the desktop wallpaper: {e}");
-    }
+    })
 }
 
 fn destroy_windows(app: &AppHandle) {
@@ -133,7 +133,12 @@ pub fn set_wallpaper(app: &AppHandle, path: String) -> Result<KinoraState, Strin
     });
     state::save(app, &s);
     rotation::mark_changed();
-    emit(app, "player:load", s.clone());
+    // A desktop that plays the video itself can say why it couldn't.
+    if state::platform(app).remote_player().is_some() {
+        push_remote(app)?;
+    } else {
+        emit(app, "player:load", s.clone());
+    }
     Ok(s)
 }
 

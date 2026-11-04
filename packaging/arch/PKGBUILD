@@ -8,6 +8,8 @@ arch=(x86_64)
 url='https://github.com/dilshad-khalil/Kinora'
 license=(custom)
 depends=(webkit2gtk-4.1 gtk3 gtk-layer-shell libayatana-appindicator)
+optdepends=('mpvpaper: video wallpapers on Hyprland (AUR)'
+            'ffmpeg: library thumbnails on Linux')
 makedepends=(rust nodejs npm)
 options=(!lto !debug)
 

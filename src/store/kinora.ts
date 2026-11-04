@@ -132,7 +132,10 @@ export const useKinora = create<KinoraStore>((set, get) => {
       const added: VideoItem[] = [];
       for (const path of videos.filter((p) => !known.has(p))) {
         try {
-          const { thumb, durationSec } = await captureThumbnail(path);
+          // The webview can't decode much on Linux, so fall back to ffmpeg for the thumbnail.
+          const { thumb, durationSec } = await captureThumbnail(path).catch(() =>
+            commands.videoThumbnail(path),
+          );
           added.push({ id: nanoid(), path, name: fileName(path), thumb, durationSec, addedAt: Date.now() });
         } catch (e) {
           // The webview can't decode it, but the desktop plays videos itself here.

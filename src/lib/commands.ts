@@ -37,5 +37,7 @@ export const commands = {
   getState: () => invoke<KinoraState>("get_state"),
   platformInfo: () => invoke<PlatformInfo>("platform_info"),
   listMonitors: () => invoke<MonitorInfo[]>("list_monitors"),
+  videoThumbnail: (path: string) =>
+    invoke<{ thumb: string; durationSec: number }>("video_thumbnail", { path }),
   missingFiles: (paths: string[]) => invoke<string[]>("missing_files", { paths }),
 };

@@ -9,6 +9,8 @@ use tauri::WebviewWindow;
 use crate::state::Fit;
 
 #[cfg(target_os = "linux")]
+mod hyprland;
+#[cfg(target_os = "linux")]
 mod kde;
 #[cfg(target_os = "linux")]
 mod layer_shell;
@@ -147,6 +149,7 @@ fn detect_linux() -> Arc<dyn Platform> {
         // An explicit choice wins, for testing.
         match std::env::var("KINORA_BACKEND").as_deref() {
             Ok("kde") => return Arc::new(kde::KdePlatform::default()),
+            Ok("hyprland") => return Arc::new(hyprland::HyprlandPlatform::default()),
             Ok("layer-shell") => return Arc::new(layer_shell::LayerShellPlatform),
             Ok("stub") => return Arc::new(stub::StubPlatform),
             _ => {}
@@ -161,6 +164,9 @@ fn detect_linux() -> Arc<dyn Platform> {
         if desktops.contains(&"hyprland")
             || std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some()
         {
+            return Arc::new(hyprland::HyprlandPlatform::default());
+        }
+        if std::env::var_os("WAYLAND_DISPLAY").is_some() {
             return Arc::new(layer_shell::LayerShellPlatform);
         }
     }
